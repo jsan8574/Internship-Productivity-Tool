@@ -520,6 +520,7 @@ const ICON = {
   back:'<path d="M15 18l-6-6 6-6"/>',
   copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   bulb:'<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  alert:'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.5"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 5.5 5"/>',
   download:'<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/>',
@@ -674,7 +675,7 @@ function navItems(){
   const items = [];
   items.push(['label','Work']);
   if (role() === 'Intern') items.push(['queue','My Queue','queue']);
-  if (isMgr()) items.push(['board','Team Board','board'], ['upload','Upload & Assign','upload']);
+  if (isMgr()) items.push(['board','Team Board','board'], ['escalations','Escalations','alert'], ['upload','Upload & Assign','upload']);
   if (isMgr()) items.push(['time','Time Study','clock'], ['team','Team & PINs','team'], ['export','Export Data','download']);
   if (canQA()) items.push(['qa','QA Review','qa']);
   if (role() === 'QA' && !isMgr()) items.push(['board','Team Board','board']);
@@ -685,11 +686,11 @@ function navItems(){
 }
 function renderSide(){
   const me = S.boot.me;
-  const returned = S.queue.filter(r => /^fail/i.test(r.qa) && r.work !== 'Completed').length;
+  const returned = S.queue.filter(r => (/^fail/i.test(r.qa) || r.guidance) && r.work !== 'Completed').length;
   const nav = navItems().map(([k, label, icon]) => {
     if (k === 'label') return `<div class="nav-label">${label}</div>`;
     const on = S.view === k || (k === 'queue' && S.view === 'work' && role() === 'Intern') || (k === 'board' && S.view === 'work' && isMgr());
-    const cnt = k === 'queue' && returned ? `<span class="count" title="Returned by QA">${returned}</span>` : (k === 'qa' && S.qaCount ? `<span class="count">${S.qaCount}</span>` : '');
+    const cnt = k === 'queue' && returned ? `<span class="count" title="Returned by QA">${returned}</span>` : (k === 'qa' && S.qaCount ? `<span class="count">${S.qaCount}</span>` : (k === 'escalations' && S.escCount ? `<span class="count">${S.escCount}</span>` : ''));
     return `<button class="${on ? 'on' : ''}" data-nav="${k}">${ic(icon)}<span>${label}</span>${cnt}</button>`;
   }).join('');
   $('#side').innerHTML = `
@@ -728,6 +729,7 @@ async function go(view, opts){
     else if (view === 'export') await viewExport();
     else if (view === 'team') await viewTeam();
     else if (view === 'time') await viewTime();
+    else if (view === 'escalations') await viewEsc();
     else if (view === 'work') await openRecord(opts.id);
   } catch(e){ fail(e); }
   renderSide();
@@ -748,7 +750,7 @@ async function viewQueue(){
   loading('My Queue');
   const [q, st] = await Promise.all([call('queue', {date:S.date, includeOpen:true}), call('stats', {})]);
   S.queue = q; S.stats = st;
-  const returned = q.filter(r => /^fail/i.test(r.qa) && r.work !== 'Completed');
+  const returned = q.filter(r => (/^fail/i.test(r.qa) || r.guidance) && r.work !== 'Completed');
   const todo = q.filter(r => r.work === 'Assigned');
   const prog = q.filter(r => r.work === 'In Progress' || r.work === 'Escalated');
   const done = q.filter(r => r.work === 'Completed');
@@ -759,15 +761,15 @@ async function viewQueue(){
   setMain(shellTop('My Queue') + `
     <div class="page-head"><div><h1>Good ${greet()}, ${esc(S.boot.me.name.split(' ')[0])}</h1><p>${fmtDay(S.date)} · ${q.length} account${q.length === 1 ? '' : 's'} in your queue</p></div>
       <div class="head-actions"><input type="date" id="qdate" class="input" value="${S.date}" aria-label="Queue date" style="width:auto">
-      ${next ? `<button class="btn primary" data-open="${next.id}">${returned.includes(next) ? 'Fix returned account' : next.work === 'Assigned' ? 'Start next account' : 'Continue working'} →</button>` : ''}</div></div>
+      ${next ? `<button class="btn primary" data-open="${next.id}">${returned.includes(next) ? (next.guidance ? 'Open manager reply' : 'Fix returned account') : next.work === 'Assigned' ? 'Start next account' : 'Continue working'} →</button>` : ''}</div></div>
     <div class="tiles">
       ${tile('Accounts in queue', q.length, done.length + ' of ' + q.length + ' completed', true)}
       ${tile('To do', todo.length)}${tile('In progress', prog.length)}${tile('Completed', done.length)}${tile('QA pass rate', passRate, st.qaReviewed + ' reviewed')}
     </div>
     <div class="card">
-      <div class="card-head"><div class="tabs" role="tablist">${[['all','All'],['returned','Returned by QA'],['todo','To do'],['prog','In progress'],['done','Done']].map(([k, l]) => `<button role="tab" aria-selected="${S.filter === k}" class="${S.filter === k ? 'on' : ''}" data-filter="${k}">${l}<span class="n">${groups[k].length}</span></button>`).join('')}</div></div>
+      <div class="card-head"><div class="tabs" role="tablist">${[['all','All'],['returned','Needs attention'],['todo','To do'],['prog','In progress'],['done','Done']].map(([k, l]) => `<button role="tab" aria-selected="${S.filter === k}" class="${S.filter === k ? 'on' : ''}" data-filter="${k}">${l}<span class="n">${groups[k].length}</span></button>`).join('')}</div></div>
       ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Patient</th><th>Provider</th><th>Service</th><th>Work</th><th>Approval status</th><th>QA</th><th></th></tr></thead><tbody>
-      ${list.map(r => `<tr class="click" data-open="${r.id}"><td><div class="pname">${esc(r.patient)}</div><div class="psub mono">DOB ${esc(r.dob)}</div></td><td>${esc(r.provider)}</td><td>${esc(r.tos)}</td><td>${pill(r.work, workTone(r.work))}${r.assignedOn < S.date && r.work !== 'Completed' ? '<div class="psub">Carried over</div>' : ''}</td><td>${pill(r.status, statusTone(r.status), true)}</td><td>${r.qa ? pill(/^pass/i.test(r.qa) ? 'Passed' : 'Returned', /^pass/i.test(r.qa) ? 'good' : 'bad') : '<span class="muted">—</span>'}</td><td style="text-align:right"><button class="btn sm" data-open="${r.id}">${r.work === 'Completed' ? 'View' : r.work === 'Assigned' ? 'Start' : 'Continue'}</button></td></tr>`).join('')}
+      ${list.map(r => `<tr class="click" data-open="${r.id}"><td><div class="pname">${esc(r.patient)}</div><div class="psub mono">DOB ${esc(r.dob)}</div></td><td>${esc(r.provider)}</td><td>${esc(r.tos)}</td><td>${pill(r.work, workTone(r.work))}${r.guidance && r.work !== 'Completed' ? '<div class="psub" style="color:var(--info);font-weight:600">Manager replied</div>' : r.assignedOn < S.date && r.work !== 'Completed' ? '<div class="psub">Carried over</div>' : ''}</td><td>${pill(r.status, statusTone(r.status), true)}</td><td>${r.qa ? pill(/^pass/i.test(r.qa) ? 'Passed' : 'Returned', /^pass/i.test(r.qa) ? 'good' : 'bad') : '<span class="muted">—</span>'}</td><td style="text-align:right"><button class="btn sm" data-open="${r.id}">${r.work === 'Completed' ? 'View' : r.work === 'Assigned' ? 'Start' : 'Continue'}</button></td></tr>`).join('')}
       </tbody></table></div>` : `<div class="empty"><h3>${S.filter === 'all' ? 'No accounts assigned for this date' : 'Nothing here'}</h3><p>${S.filter === 'all' ? 'Your manager assigns accounts each morning. Meanwhile, browse the Knowledge Base.' : 'Try another tab.'}</p></div>`}
     </div>`);
 }
@@ -865,9 +867,11 @@ function renderWork(){
       <div><div class="eyebrow">Provider</div><div class="val">${esc(r.provider)}</div></div>
       <div><div class="eyebrow">Type of service</div><div class="val">${esc(r.tos)}</div></div>
     </div>
+    ${r.guidance && r.work !== 'Completed' ? `<div class="qa-flag" style="background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 35%,transparent)"><b style="color:var(--info)">Manager guidance:</b> ${esc(r.guidance)}${r.escReviewedBy ? `<div class="psub">Reviewed by ${esc(r.escReviewedBy)} · ${esc(r.escReviewedAt)}</div>` : ''}<div class="psub" style="margin-top:4px">Follow the guidance, then submit, or escalate again if still unclear.</div></div>` : ''}
+    ${r.work === 'Escalated' ? `<div class="qa-flag" style="background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent)"><b style="color:var(--warn)">Escalated:</b> ${esc((r.comment || '').replace(/^ESCALATED:\s*/, ''))}</div>` : ''}
     ${returned ? `<div class="qa-flag"><b>Returned by QA:</b> ${esc(r.qaComment || 'No comment given')}. Fix the item, then submit again.</div>` : ''}`;
   const body = S.guided && !ro ? guidedHTML() : expressHTML();
-  setMain(shellTop('Verify') + head + `<div class="ws"><div style="min-width:0">${body}</div>${asideHTML()}</div>`);
+  setMain(shellTop('Verify') + head + escalatePanelHTML() + `<div class="ws"><div style="min-width:0">${body}</div>${asideHTML()}</div>`);
 }
 
 function guidedHTML(){
@@ -906,8 +910,17 @@ function guidedHTML(){
 
 function escalateHTML(){
   if (readOnly()) return '';
-  if (S.pendingEscalate) return `<span class="inline-confirm">Escalate to your manager? Your comment is sent with it. <button class="btn sm danger" data-act="escalate-yes">Escalate</button><button class="btn sm" data-act="escalate-no">Cancel</button></span>`;
-  return `<button class="btn" data-act="escalate">Escalate</button>`;
+  return S.pendingEscalate ? '' : `<button class="btn" data-act="escalate">Escalate to manager</button>`;
+}
+function escalatePanelHTML(){
+  if (!S.pendingEscalate || readOnly()) return '';
+  return `<div class="card card-pad" id="escPanel" style="margin-bottom:20px;border:2px solid var(--warn)">
+    <div class="eyebrow" style="color:var(--warn)">Escalate to manager</div>
+    <h3 style="margin:6px 0 4px">What do you need help with?</h3>
+    <p class="muted" style="font-size:.9rem;margin-bottom:12px">Say what you checked, what you found, and what is unclear. Your manager sees this on the Team Board. The account is marked ON HOLD and stays in your queue as Escalated.</p>
+    <textarea class="input" id="escNote" style="min-height:100px" placeholder="e.g. TEBRA shows active, Availity shows term 08/31. Called Humana, disconnected after 25 min. Which source should I trust?"></textarea>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-act="escalate-no">Cancel</button><button class="btn primary" data-act="escalate-yes" style="background:var(--warn)">Send to manager</button></div>
+  </div>`;
 }
 
 function expressHTML(){
@@ -936,6 +949,7 @@ function asideHTML(){
     ${readOnly() ? '' : `<div class="card"><div class="eyebrow" style="margin-bottom:10px">Time on this account</div>
       <dl class="kv"><dt>${esc((STEPS.find(x => x.key === S.curSec) || STEPS[0]).short)} (this section)</dt><dd class="tnum mono" id="tsNow">${fmtMin((S.timing || {})[S.curSec] || 0)}</dd><dt>Total active</dt><dd class="tnum mono" id="tsTotal">${fmtMin(Object.values(S.timing || {}).reduce((a, b) => a + b, 0))}</dd></dl>
       <p class="hint" style="margin-top:8px;font-size:.78rem;color:var(--faint)">Counts active time only. Pauses after 3 minutes without activity.</p></div>`}
+    ${r.escThread ? `<div class="card"><div class="eyebrow" style="margin-bottom:10px">Escalation history</div>${threadHTML(r.escThread)}${r.escReviewedBy ? `<p class="psub" style="margin-top:10px">Last reviewed by <b>${esc(r.escReviewedBy)}</b> · ${esc(r.escReviewedAt)}</p>` : `<p class="psub" style="margin-top:10px;color:var(--warn)">Not reviewed yet</p>`}</div>` : ''}
     <div class="card"><div class="eyebrow" style="margin-bottom:10px">Quick reference</div><div class="intern-chips">
       ${['decision-matrix','statuses','payer-call','hospice','note-format'].map(id => `<button class="chip" data-kb="${id}">${esc(KB.find(a => a.id === id).title.split('(')[0].trim())}</button>`).join('')}</div></div>
   </aside>`;
@@ -971,10 +985,17 @@ async function submitRecord(){
     else { toast('Submitted. Your queue is clear.'); go(role() === 'Intern' ? 'queue' : 'board'); }
   } catch(e){ fail(e); }
 }
-async function escalateRecord(){
-  if (!S.draft.comment){ S.pendingEscalate = false; toast('Add a comment saying what you checked and what is unclear, then escalate.', true); if (S.guided){ S.step = STEPS.length - 1; } renderWork(); setTimeout(() => { const c = $('#f_comment'); if (c) c.focus(); }, 30); return; }
-  const fields = sheetPatch(); if (!fields.status) fields.status = 'ON HOLD';
-  try { await call('save', {id:S.rec.id, fields, escalate:true}); toast('Escalated to your manager'); go(role() === 'Intern' ? 'queue' : 'board'); } catch(e){ fail(e); }
+async function escalateRecord(btn){
+  const note = ($('#escNote') ? $('#escNote').value : '').trim();
+  if (note.length < 10){ toast('Write at least a sentence: what you checked and what is unclear.', true); const t = $('#escNote'); if (t) t.focus(); return; }
+  const old = (S.draft.comment || '').trim();
+  S.draft.comment = 'ESCALATED: ' + note + (old && old !== note ? ' | Earlier note: ' + old : '');
+  S.draft.status = 'ON HOLD'; S.draft.statusAuto = false;
+  persistLocal();
+  const fields = sheetPatch();
+  if (btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
+  try { await call('save', {id:S.rec.id, fields, escalate:true, note}); S.pendingEscalate = false; toast('Escalated. Your manager can see it on the Team Board.'); go(role() === 'Intern' ? 'queue' : 'board'); }
+  catch(e){ if (btn){ btn.disabled = false; btn.textContent = 'Send to manager'; } fail(e); }
 }
 
 /* ---------------- manager: board ---------------- */
@@ -992,7 +1013,7 @@ async function viewBoard(){
       <div class="head-actions"><input type="date" id="bdate" class="input" value="${S.date}" aria-label="Board date" style="width:auto"><button class="btn primary" data-nav="upload">+ Upload & assign</button></div></div>
     <div class="tiles">
       ${tile('Completed today', done, `of ${sm.rows.length} assigned · ${sm.rows.length ? Math.round(done / sm.rows.length * 100) : 0}%`, true)}
-      ${tile('Not started', sm.rows.filter(r => r.work === 'Assigned').length)}${tile('In progress', sm.rows.filter(r => r.work === 'In Progress').length)}${tile('Escalated', sm.rows.filter(r => r.work === 'Escalated').length, 'Need your decision')}${tile('Awaiting QA', qa.length)}
+      ${tile('Not started', sm.rows.filter(r => r.work === 'Assigned').length)}${tile('In progress', sm.rows.filter(r => r.work === 'In Progress').length)}<div class="tile" style="cursor:pointer" data-nav="escalations" title="Open Escalations"><div class="eyebrow">Escalated</div><div class="num">${sm.rows.filter(r => r.work === 'Escalated').length}</div><div class="sub" style="color:var(--accent);font-weight:600">Open Escalations →</div></div>${tile('Awaiting QA', qa.length)}
     </div>
     <div class="grid-2" style="margin-bottom:20px">
       <div class="card"><div class="card-head"><h2>Intern progress</h2><span class="muted" style="font-size:.85rem">completed / assigned</span></div>
@@ -1110,6 +1131,47 @@ function renderQA(){
         <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn danger" data-act="qa-fail">Fail & return</button><button class="btn primary" data-act="qa-pass">Pass</button></div>
       </div></aside>` : ''}
     </div>` : `<div class="card"><div class="empty"><h3>All caught up</h3><p>No completed accounts are waiting for QA.</p></div></div>`}`);
+}
+
+/* ---------------- manager: escalations ---------------- */
+function threadHTML(t){
+  return `<div style="display:flex;flex-direction:column;gap:10px">${String(t || '').split('\n').filter(Boolean).map(line => {
+    const m = line.match(/^(.*?) · (.*?): (.*)$/); if (!m) return `<div style="font-size:.88rem">${esc(line)}</div>`;
+    const mgr = /\(manager\)/.test(m[2]);
+    return `<div style="border-left:3px solid ${mgr ? 'var(--info)' : 'var(--warn)'};padding:2px 0 2px 10px"><div class="psub">${esc(m[2])} · ${esc(m[1])}</div><div style="font-size:.9rem">${esc(m[3])}</div></div>`;
+  }).join('')}</div>`;
+}
+async function viewEsc(){
+  loading('Escalations');
+  S.escList = await call('queue', {escalated:true}); S.escCount = S.escList.length;
+  if (!S.escList.find(r => r.id === S.escSel)) S.escSel = S.escList[0] ? S.escList[0].id : null;
+  renderEsc();
+}
+function renderEsc(){
+  const L = S.escList, r = L.find(x => x.id === S.escSel), interns = S.boot.roster.filter(x => x.role === 'Intern');
+  setMain(shellTop('Escalations') + `
+    <div class="page-head"><div><h1>Escalations</h1><p>${L.length} account${L.length === 1 ? '' : 's'} waiting for your decision, oldest first. Send guidance back to the intern, decide the status yourself, or reassign.</p></div></div>
+    ${L.length ? `<div class="ws">
+      <div class="card" style="min-width:0"><div class="table-wrap"><table><thead><tr><th>Patient</th><th>Intern</th><th>Escalated</th></tr></thead><tbody>
+        ${L.slice().sort((a, b) => (a.escAt || '').localeCompare(b.escAt || '')).map(x => `<tr class="click" data-esc="${x.id}" style="${x.id === S.escSel ? 'background:var(--accent-soft)' : ''}"><td><div class="pname">${esc(x.patient)}</div><div class="psub">${esc(x.tos)} · ${esc(x.id)}</div></td><td>${esc(x.internName)}</td><td class="tnum">${esc(x.escAt || '—')}</td></tr>`).join('')}
+      </tbody></table></div></div>
+      ${r ? `<aside class="aside-stack">
+        <div class="card"><div class="eyebrow">Escalated by ${esc(r.internName)}</div><h3 style="margin:6px 0 2px">${esc(r.patient)}</h3><p class="muted mono" style="margin-bottom:14px">DOB ${esc(r.dob)} · ${esc(r.provider)}</p>
+          ${threadHTML(r.escThread || ('— · ' + r.internName + ' (intern): ' + (r.comment || '').replace(/^ESCALATED:\s*/, '')))}
+          <div class="spacer"></div>
+          <dl class="kv">${[['Service',r.tos],['DOS',r.dos],['Plan',r.plan],['Member ID',r.memberId],['Verified via',r.source],['Reference',r.reference],['Eligible',r.eligibility],['Contracted',r.contracted],['Hospice',r.hospice]].map(([a, b]) => `<dt>${a}</dt><dd>${esc(b || '—')}</dd>`).join('')}</dl>
+          <div class="spacer"></div><button class="btn sm" data-open="${r.id}">Open full account</button>
+        </div>
+        <div class="card">
+          <div class="field"><label for="escReply">Review note (required)</label><span class="hint">Saved to the account with your name and time as the record that you reviewed it.</span><textarea class="input" id="escReply" placeholder="e.g. Trust the payer portal; TEBRA hasn't updated. Mark Policy Not Active and note the term date."></textarea></div>
+          <div class="spacer"></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div><button class="btn primary" data-act="esc-guide" style="width:100%;justify-content:center">Send back to ${esc(r.internName.split(' ')[0] || 'intern')} with guidance</button><p class="hint" style="font-size:.78rem;color:var(--faint);margin-top:4px">Goes back to their queue with your note on top. Best for coaching.</p></div>
+            <div class="row" style="flex-wrap:nowrap"><select class="input" id="escStatus" aria-label="Final status"><option value="">Final status…</option>${S.boot.statuses.map(x => `<option>${esc(x)}</option>`).join('')}</select><button class="btn" data-act="esc-resolve" style="flex:none">Resolve</button></div>
+            <div class="row" style="flex-wrap:nowrap"><select class="input" id="escTo" aria-label="Reassign to"><option value="">Reassign to…</option>${interns.filter(x => x.email !== r.internEmail).map(x => `<option value="${esc(x.email)}">${esc(x.name)}</option>`).join('')}</select><button class="btn" data-act="esc-reassign" style="flex:none">Reassign</button></div>
+          </div>
+        </div></aside>` : ''}
+    </div>` : `<div class="card"><div class="empty"><h3>No open escalations</h3><p>When an intern escalates an account, it appears here and on the Team Board.</p></div></div>`}`);
 }
 
 /* ---------------- manager: time study ---------------- */
@@ -1383,7 +1445,7 @@ function renderKB(){
 
 /* ---------------- events ---------------- */
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-nav],[data-act],[data-open],[data-filter],[data-step],[data-set],[data-tips],[data-kb],[data-kbcat],[data-role],[data-pick],[data-qa],[data-reason],[data-reveal],[data-resetpin],[data-toggleactive]');
+  const t = e.target.closest('[data-nav],[data-act],[data-open],[data-filter],[data-step],[data-set],[data-tips],[data-kb],[data-kbcat],[data-role],[data-pick],[data-qa],[data-reason],[data-reveal],[data-resetpin],[data-toggleactive],[data-esc]');
   if (!t) return;
   if (t.closest('[data-stop]') && !t.matches('[data-stop]')) return;
   const ds = t.dataset;
@@ -1402,6 +1464,7 @@ document.addEventListener('click', async e => {
   if (ds.resetpin){ if (S.tm.confirmReset !== ds.resetpin){ S.tm.confirmReset = ds.resetpin; t.textContent = 'Click again to reset'; t.classList.add('danger'); setTimeout(() => { if (S.tm.confirmReset === ds.resetpin){ S.tm.confirmReset = null; renderTeam(); } }, 4000); return; }
     S.tm.confirmReset = null; try { const r = await call('teamResetPin', {email:ds.resetpin}); S.tm.team = r.team; S.tm.reset = {email:r.email, pin:r.pin}; S.tm.added = null; renderTeam(); window.scrollTo(0, 0); toast('PIN reset'); } catch(err){ fail(err); } return; }
   if (ds.toggleactive){ try { S.tm.team = await call('teamSet', {email:ds.toggleactive, active:ds.on === '1'}); syncRoster(); renderTeam(); toast(ds.on === '1' ? 'Activated' : 'Deactivated'); } catch(err){ fail(err); } return; }
+  if (ds.esc){ S.escSel = ds.esc; renderEsc(); return; }
   if (ds.reason){ S.qaReason = S.qaReason === ds.reason ? '' : ds.reason; renderQA(); return; }
   switch (ds.act){
     case 'toggle-guided': S.guided = !S.guided; store.set('guided', S.guided); renderSide(); if (S.view === 'work') renderWork(); toast(S.guided ? 'Guided mode on: step-by-step prompts' : 'Express mode: all prompts skipped'); break;
@@ -1411,6 +1474,15 @@ document.addEventListener('click', async e => {
     case 'tm-clear': S.tm.rows = []; renderTeam(); break;
     case 'tm-save': { t.disabled = true; try { const r = await call('teamUpsert', {people:S.tm.rows.filter(x => !x.bad).map(x => ({name:x.name, email:x.email, role:x.role}))}); S.tm.team = r.team; S.tm.added = r.added; S.tm.rows = []; syncRoster(); renderTeam(); window.scrollTo(0, 0); toast(r.added.length + ' added, ' + r.updated + ' updated'); } catch(err){ t.disabled = false; fail(err); } break; }
     case 'copy-pins': { const txt = $('#pinbox').textContent; try { await navigator.clipboard.writeText(txt); toast('PINs copied'); } catch(err){ const r = document.createRange(); r.selectNodeContents($('#pinbox')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Selected. Press Ctrl+C to copy.'); } break; }
+    case 'esc-guide': case 'esc-resolve': case 'esc-reassign': {
+      const action = ds.act.slice(4), note = $('#escReply').value.trim(), status = $('#escStatus').value, email = $('#escTo').value;
+      if (note.length < 5){ toast('Add a review note first. It is saved as the record of your review.', true); $('#escReply').focus(); break; }
+      if (action === 'resolve' && !status){ toast('Choose the final status.', true); break; }
+      if (action === 'reassign' && !email){ toast('Choose who to reassign to.', true); break; }
+      t.disabled = true;
+      try { await call('escalation', {id:S.escSel, action, note, status, email}); toast(action === 'guide' ? 'Sent back with your guidance' : action === 'resolve' ? 'Resolved as ' + status : 'Reassigned'); S.escSel = null; await viewEsc(); renderSide(); }
+      catch(err){ t.disabled = false; fail(err); }
+      break; }
     case 'ex-csv': try { await doExport('csv'); } catch(err){ fail(err); } break;
     case 'ex-xlsx': try { await doExport('xlsx'); } catch(err){ fail(err); } break;
     case 'ex-sheet': { t.disabled = true; t.textContent = 'Creating…'; try { S.ex.sheet = await call('exportSheet', exportParams()); renderExport(); toast('Google Sheet created'); } catch(err){ t.disabled = false; t.textContent = 'Create Google Sheet copy'; fail(err); } break; }
@@ -1423,9 +1495,9 @@ document.addEventListener('click', async e => {
     case 'next': await saveDraft(true); S.step = Math.min(STEPS.length - 1, S.step + 1); persistLocal(); renderWork(); window.scrollTo(0, 0); break;
     case 'save': await saveDraft(false); renderWork(); break;
     case 'submit': await submitRecord(); break;
-    case 'escalate': S.pendingEscalate = true; renderWork(); break;
+    case 'escalate': S.pendingEscalate = true; renderWork(); setTimeout(() => { const p = $('#escPanel'); if (p){ p.scrollIntoView({behavior:'smooth', block:'center'}); const t = $('#escNote'); if (t) t.focus({preventScroll:true}); } }, 30); break;
     case 'escalate-no': S.pendingEscalate = false; renderWork(); break;
-    case 'escalate-yes': await escalateRecord(); break;
+    case 'escalate-yes': await escalateRecord(t); break;
     case 'accept': { const s = suggest(S.draft, S.rec); if (s.status){ S.draft.status = s.status; S.draft.statusAuto = true; persistLocal(); renderWork(); toast('Status set to ' + s.status); } break; }
     case 'copy-note': {
       const txt = noteText(S.draft, S.rec);
@@ -1511,7 +1583,7 @@ const Mock = (function(){
     mk('Walter Lindqvist (sample)','12/01/1939','Dr. Elena Park, NP','TCM',B, done({plan:'UHC AARP Medicare Advantage', hospice:'Yes', contracted:'No', status:'Ok for Group Billing', comment:'Hospice since 08/2026 per Medicare.'})),
     mk('Patricia Moody (sample)','02/27/1955','Dr. Samuel Reyes, MD','Annual Wellness Visit',C, done({plan:'BCBS AZ PPO', mode:'Express'})),
     mk('Franklin Ibarra (sample)','08/15/1947','Dr. Elena Park, NP','CCM',C, done({plan:'Medicare Part B', eligibility:'No', status:'Policy Not Active', contracted:'', hospice:''})),
-    mk('Irene Vasquez (sample)','04/04/1952','Dr. Samuel Reyes, MD','Home Visit',C, {work:'Escalated', status:'ON HOLD', comment:'TEBRA shows active, portal shows term 08/31. Payer call dropped after 25 min.'}),
+    mk('Irene Vasquez (sample)','04/04/1952','Dr. Samuel Reyes, MD','Home Visit',C, {work:'Escalated', status:'ON HOLD', escAt:T + ' 09:20', comment:'ESCALATED: TEBRA shows active, portal shows term 08/31. Payer call dropped after 25 min.', escThread:T + ' 09:20 · Carlo Dizon (intern): TEBRA shows active, portal shows term 08/31. Payer call dropped after 25 min. Which source wins?'}),
     mk('Clarence Boyd (sample)','10/10/1941','Dr. Elena Park, NP','Annual Wellness Visit',C),
     mk('Margaret Ellison (sample)','06/06/1949','Dr. Samuel Reyes, MD','Annual Wellness Visit',M, done({plan:'Humana Choice PPO', status:'Frequency Requirement Not Met', comment:'Last AWV 02/2026.'})),
     mk('Victor Nakamura (sample)','03/03/1946','Dr. Elena Park, NP','TCM',M, {work:'In Progress', startedAt:T + ' 09:30'}),
@@ -1542,7 +1614,13 @@ const Mock = (function(){
     if (a === 'teamSet'){ const r = roster.find(x => x.email === p.email); if (r.email === u.email && !p.active) throw new Error("You can't deactivate yourself."); r.active = p.active; return roster; }
     if (a === 'teamResetPin'){ const r = roster.find(x => x.email === p.email); r.pin = pin(); return {email:r.email, pin:r.pin, team:roster}; }
     if (a === 'bootstrap') return {me:u, roster:roster.filter(x => x.active).map(({pin, ...x}) => x), statuses:['Good to Schedule','Provider out of Network','Policy Not Active','Deceased','Approved for Self Pay','No self pay agreement','Ok for Group Billing','Frequency Requirement Not Met','TEBRA INACTIVE','ON HOLD','No TCM Coverage'], today:T};
+    if (a === 'escalation'){ if (String(p.note || '').trim().length < 5) throw new Error('Add a review note. It is saved with the escalation as the record of your review.'); const r = find(p.id); const st = T + ' ' + new Date().toTimeString().slice(0, 5); const add = (w, t) => r.escThread = (r.escThread ? r.escThread + '\n' : '') + st + ' · ' + w + ': ' + t;
+      if (p.action === 'guide'){ r.work = 'In Progress'; r.guidance = p.note; add(u.name + ' (manager)', p.note); }
+      else if (p.action === 'resolve'){ r.work = 'Completed'; r.status = p.status; r.statusSource = 'Manager decision'; r.guidance = ''; r.verifDate = T; r.completedAt = st; add(u.name + ' (manager)', 'Resolved as ' + p.status + (p.note ? ' — ' + p.note : '')); }
+      else { const who = roster.find(x => x.email === p.email); r.internEmail = who.email; r.internName = who.name; r.work = 'In Progress'; r.guidance = p.note || 'Reassigned by ' + u.name; add(u.name + ' (manager)', 'Reassigned to ' + who.name + (p.note ? ' — ' + p.note : '')); }
+      r.escReviewedBy = u.name; r.escReviewedAt = st; return r; }
     if (a === 'queue') return rows.filter(r => {
+      if (p.escalated) return r.work === 'Escalated';
       if (u.role === 'Intern' && r.internEmail !== u.email) return false;
       if (p.needsQA) return r.work === 'Completed' && !r.qa;
       if (p.date && r.assignedOn !== p.date) return !!p.includeOpen && r.work !== 'Completed' && r.assignedOn < p.date;
@@ -1550,8 +1628,8 @@ const Mock = (function(){
     if (a === 'record') return find(p.id);
     if (a === 'start'){ const r = find(p.id); if (r.work === 'Assigned'){ r.work = 'In Progress'; r.startedAt = stamp(); } return r; }
     if (a === 'save'){ const r = find(p.id); Object.assign(r, p.fields || {});
-      if (p.complete){ r.work = 'Completed'; r.completedAt = stamp(); r.verifDate = T; r.internName = u.name; if (r.qa) r.qa = ''; }
-      else if (p.escalate) r.work = 'Escalated'; else if (r.work === 'Assigned') r.work = 'In Progress'; return r; }
+      if (p.complete){ r.work = 'Completed'; r.completedAt = stamp(); r.verifDate = T; r.internName = u.name; r.guidance = ''; if (r.qa) r.qa = ''; }
+      else if (p.escalate){ r.work = 'Escalated'; r.status = 'ON HOLD'; r.guidance = ''; r.escAt = stamp(); r.escThread = (r.escThread ? r.escThread + '\n' : '') + stamp() + ' · ' + u.name + ' (intern): ' + (p.note || ''); } else if (r.work === 'Assigned') r.work = 'In Progress'; return r; }
     if (a === 'upload'){ (p.rows || []).forEach(x => { const who = roster.find(y => y.email === x.internEmail) || {}; rows.push(mk(x.patient, x.dob, x.provider, x.tos, who, {assignedOn:p.date, dos:x.dos || ''})); }); return {added:(p.rows || []).length, date:p.date}; }
     if (a === 'reassign'){ const who = roster.find(y => y.email === p.email); p.ids.forEach(id => { const r = find(id); r.internEmail = who.email; r.internName = who.name; }); return {moved:p.ids.length}; }
     if (a === 'qa'){ const r = find(p.id); r.qa = p.result; r.qaComment = p.comment; r.qaBy = u.email; if (p.result === 'FAILED') r.work = 'In Progress'; return r; }
@@ -1602,6 +1680,7 @@ async function boot(){
     S.date = S.boot.today || localToday();
     S.queue = []; S.boardSel.clear(); S.filter = 'all';
     if (canQA()) call('queue', {needsQA:true}).then(q => { S.qaCount = q.length; renderSide(); }).catch(() => {});
+    if (isMgr()) call('queue', {escalated:true}).then(q => { S.escCount = q.length; renderSide(); }).catch(() => {});
     go(role() === 'Intern' ? 'queue' : 'board');
   } catch(e){
     if (IS_GAS && !S.boot && /sign in/i.test(e.message || '')) return; // login screen already shown

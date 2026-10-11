@@ -78,12 +78,19 @@ var COLS = {
   tSvc:        'MIN: SERVICE',
   tDecide:     'MIN: DECIDE',
   tDoc:        'MIN: DOCUMENT',
-  tTotal:      'MIN: TOTAL ACTIVE'
+  tTotal:      'MIN: TOTAL ACTIVE',
+  // ---- escalations ----
+  escAt:       'ESCALATED AT',
+  guidance:    'MANAGER GUIDANCE',
+  escThread:   'ESCALATION THREAD',
+  escReviewedBy: 'ESCALATION REVIEWED BY',
+  escReviewedAt: 'ESCALATION REVIEWED AT'
 };
 var COL_ORDER = ['verifDate','internName','status','provider','patient','dob','tos','dos','plan',
   'contracted','eligibility','hospice','caseName','notes','comment','qa','qaComment',
   'id','assignedOn','internEmail','work','source','memberId','reference','mode','startedAt','completedAt','qaBy','updatedBy',
-  'statusSource','tFind','tIns','tElig','tNet','tHosp','tSvc','tDecide','tDoc','tTotal'];
+  'statusSource','tFind','tIns','tElig','tNet','tHosp','tSvc','tDecide','tDoc','tTotal',
+  'escAt','guidance','escThread','escReviewedBy','escReviewedAt'];
 
 var APPROVAL_STATUSES = ['Good to Schedule','Provider out of Network','Policy Not Active','Deceased',
   'Approved for Self Pay','No self pay agreement','Ok for Group Billing','Frequency Requirement Not Met',
@@ -174,6 +181,7 @@ function setup() {
     lg.setFrozenRows(1);
   }
   adoptNewRows_();
+  backfillVerifDates_();
   return 'Setup complete';
 }
 
@@ -198,6 +206,7 @@ function api(action, payload, token) {
     case 'teamUpsert':  requireManager_(me); return teamUpsert_(me, payload);
     case 'teamSet':     requireManager_(me); return teamSet_(me, payload);
     case 'teamResetPin':requireManager_(me); return teamResetPin_(me, payload);
+    case 'escalation':  requireManager_(me); return escalation_(me, payload);
     case 'export':      requireManager_(me); return export_(me, payload);
     case 'exportSheet': requireManager_(me); return exportSheet_(me, payload);
     case 'stats':     return stats_(me, payload);
@@ -207,6 +216,7 @@ function api(action, payload, token) {
 
 function bootstrap_(me) {
   adoptNewRows_();
+  backfillVerifDates_();
   return {
     me: me,
     roster: roster_().filter(function (r) { return r.active; }).map(function (r) { return { name: r.name, email: r.email, role: r.role, active: r.active }; }),
@@ -222,6 +232,7 @@ function queue_(me, p) {
   var rows = all.filter(function (r) {
     if (me.role === 'Intern' && r.internEmail.toLowerCase() !== me.email) return false;
     if (p.email && r.internEmail.toLowerCase() !== p.email.toLowerCase()) return false;
+    if (p.escalated) return r.work === 'Escalated';
     if (p.needsQA) return r.work === 'Completed' && !r.qa;
     if (date && r.assignedOn !== date) {
       // Always carry forward unfinished work from earlier days.
@@ -416,15 +427,58 @@ function saveRecord_(me, p) {
       patch.work = 'Completed';
       patch.completedAt = nowStamp_();
       patch.verifDate = today_();
+      patch.completedAt = patch.completedAt || nowStamp_();
       patch.internName = me.name;
+      patch.guidance = '';
     } else if (p.escalate) {
+      var note = String(p.note || '').slice(0, 1500);
       patch.work = 'Escalated';
+      patch.status = 'ON HOLD';
+      patch.escAt = nowStamp_();
+      patch.guidance = '';
+      patch.escReviewedBy = '';
+      patch.escReviewedAt = '';
+      patch.escThread = appendThread_(r.escThread, me.name + ' (intern)', note);
     } else if (r.work === 'Assigned') {
       patch.work = 'In Progress';
     }
     if (r.qa && p.complete) { patch.qa = ''; } // re-submitted after a QA fail → back into the QA queue
     writePatch_(r._row, patch, me);
     log_(me, p.complete ? 'complete' : (p.escalate ? 'escalate' : 'save'), p.id, patch.status || '');
+    return findById_(p.id);
+  });
+}
+
+// ---------- Escalations ----------
+function appendThread_(thread, who, text) {
+  var line = nowStamp_() + ' · ' + who + ': ' + String(text || '').replace(/\s*\n\s*/g, ' ');
+  return (thread ? thread + '\n' : '') + line;
+}
+// Manager actions on an escalated account: guide (send back), resolve (final status), reassign.
+function escalation_(me, p) {
+  return withLock_(function () {
+    var r = findById_(p.id);
+    if (!r) throw new Error('Record not found.');
+    var note = String(p.note || '').trim();
+    if (note.length < 5) throw new Error('Add a review note. It is saved with the escalation as the record of your review.');
+    var patch = {};
+    if (p.action === 'guide') {
+      patch = { work: 'In Progress', guidance: note, escThread: appendThread_(r.escThread, me.name + ' (manager)', note) };
+    } else if (p.action === 'resolve') {
+      if (APPROVAL_STATUSES.indexOf(p.status) === -1) throw new Error('Choose the final approval status.');
+      patch = { work: 'Completed', status: p.status, statusSource: 'Manager decision', guidance: '',
+        verifDate: today_(), completedAt: nowStamp_(),
+        escThread: appendThread_(r.escThread, me.name + ' (manager)', 'Resolved as ' + p.status + (note ? ' — ' + note : '')) };
+    } else if (p.action === 'reassign') {
+      var who = roster_().filter(function (x) { return x.email === String(p.email || '').toLowerCase() && x.active; })[0];
+      if (!who) throw new Error('Choose an active intern.');
+      patch = { internEmail: who.email, internName: who.name, work: 'In Progress', guidance: note || ('Reassigned by ' + me.name),
+        escThread: appendThread_(r.escThread, me.name + ' (manager)', 'Reassigned to ' + who.name + (note ? ' — ' + note : '')) };
+    } else throw new Error('Unknown escalation action.');
+    patch.escReviewedBy = me.name;
+    patch.escReviewedAt = nowStamp_();
+    writePatch_(r._row, patch, me);
+    log_(me, 'escalation ' + p.action, p.id, p.status || p.email || '');
     return findById_(p.id);
   });
 }
@@ -604,6 +658,22 @@ function adoptNewRows_() {
       if (who && !row[map.internEmail - 1]) sh.getRange(r, map.internEmail).setValue(who.email);
       if (!row[map.assignedOn - 1]) sh.getRange(r, map.assignedOn).setValue(today_());
       if (!row[map.work - 1]) sh.getRange(r, map.work).setValue(row[map.status - 1] ? 'Completed' : 'Assigned');
+      n++;
+    }
+  });
+  return n;
+}
+// Completed rows missing DATE OF VERIFICATION get the date from COMPLETED AT (or today).
+function backfillVerifDates_() {
+  var sh = sheet_(); if (!sh) return 0;
+  var map; try { map = colMap_(sh); } catch (e) { return 0; }
+  var last = lastDataRow_(sh); if (last < 2) return 0;
+  var vals = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getDisplayValues();
+  var n = 0;
+  vals.forEach(function (row, i) {
+    if (row[map.work - 1] === 'Completed' && !String(row[map.verifDate - 1]).trim()) {
+      var c = String(row[map.completedAt - 1] || '').slice(0, 10);
+      sh.getRange(i + 2, map.verifDate).setNumberFormat('@').setValue(/^\d{4}-\d{2}-\d{2}$/.test(c) ? c : today_());
       n++;
     }
   });
