@@ -1,0 +1,1295 @@
+<title>Verify Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: CRM-style shell — deep-teal sidebar, warm off-white work canvas, white work cards; KB is a right slide-over reachable from anywhere. */
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --surface-2:#f0f1ee; --line:#e3e6e2; --line-strong:#cfd6d2;
+  --fg:#12302f; --muted:#5f6f6c; --faint:#8a9895;
+  --side:#164a4b; --side-2:#1f5a5b; --side-fg:#d9e7e4; --side-muted:#8fb0ab;
+  --hero:#e4f1ee; --hero-fg:#12302f; --hero-line:#c9e2dc;
+  --teal:#2a7a7f; --green:#59a67d; --accent:#23767b; --accent-soft:#e2f0ee; --accent-fg:#ffffff;
+  --grad:linear-gradient(90deg,#2a7a7f,#59a67d);
+  --orange:#e08a2b; --orange-soft:#fbeedd;
+  --good:#2f8a5b; --good-soft:#e2f3e9; --warn:#b97512; --warn-soft:#fcf0dc; --bad:#c2453b; --bad-soft:#fbe6e3; --info:#2d6f9a; --info-soft:#e3eff7;
+  --shadow:0 1px 2px rgba(18,48,47,.05),0 6px 18px rgba(18,48,47,.06);
+  --f-display:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:14px; --r-sm:9px; color-scheme:light;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(1.6rem,2.6vw,2.1rem);font-weight:800}
+h2{font-size:1.25rem;font-weight:700}
+h3{font-size:1.02rem;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-size:.86em}
+.muted{color:var(--muted)}
+.eyebrow{font:600 .72rem/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* Shell */
+.app{display:grid;grid-template-columns:270px minmax(0,1fr);min-height:100%}
+.side{background:var(--side);color:var(--side-fg);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{background:var(--surface);display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.brand-mark{font:800 1.3rem/1 var(--f-display);white-space:nowrap;color:var(--side);letter-spacing:-.04em;position:relative}
+.brand-mark::after{content:"";position:absolute;left:2px;right:-2px;bottom:-5px;height:3px;border-radius:3px;background:var(--grad)}
+.brand-name{font:600 .72rem/1.25 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.nav{padding:18px 14px;display:flex;flex-direction:column;gap:2px;flex:1}
+.nav-label{font:600 .72rem/1 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--side-muted);padding:16px 12px 8px}
+.nav-label:first-child{padding-top:4px}
+.nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;color:var(--side-fg);font-weight:500}
+.nav button svg{width:19px;height:19px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;opacity:.85}
+.nav button:hover{background:var(--side-2)}
+.nav button.on{background:var(--side-2);box-shadow:inset 3px 0 0 var(--green)}
+.nav button:focus-visible{outline:2px solid var(--green)}
+.nav .count{margin-left:auto;background:var(--orange);color:#fff;font-size:.72rem;font-weight:700;min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;padding:0 6px}
+.side-foot{padding:14px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:12px}
+.mode-switch{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.14);border-radius:12px;cursor:pointer}
+.mode-switch b{font-weight:600}
+.mode-switch small{display:block;color:var(--side-muted);font-size:.78rem;line-height:1.3}
+.toggle{position:relative;width:38px;height:22px;flex:none;border-radius:11px;background:rgba(255,255,255,.2);transition:background .2s}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+.toggle.on{background:var(--green)}
+.toggle.on::after{transform:translateX(16px)}
+.me{display:flex;align-items:center;gap:10px}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+.me-name{font-weight:600;line-height:1.2}
+.me-sub{font-size:.8rem;color:var(--side-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.role-pick{display:flex;gap:6px}
+.role-pick button{all:unset;cursor:pointer;flex:1;text-align:center;font-size:.8rem;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.18)}
+.role-pick button.on{background:var(--side-2);border-color:var(--green)}
+
+.main{min-width:0;padding-inline:clamp(16px,3.2vw,48px);padding-block:32px 80px}
+.topbar{display:none}
+.demo-banner{display:flex;gap:10px;align-items:center;background:var(--orange-soft);color:var(--fg);border:1px solid color-mix(in srgb,var(--orange) 35%,transparent);border-radius:12px;padding:10px 14px;margin-bottom:22px;font-size:.9rem}
+.demo-banner b{color:var(--orange)}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:26px}
+.page-head p{color:var(--muted);margin-top:4px}
+.head-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* Buttons & inputs */
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--fg);padding:9px 16px;border-radius:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--grad);color:#fff;border:0;box-shadow:0 4px 14px rgba(42,122,127,.25)}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-inline:8px}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.btn.sm{padding:6px 11px;font-size:.86rem;border-radius:9px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.field .lbl{font-size:.82rem;font-weight:600;color:var(--muted)}
+.field .hint{font-size:.78rem;color:var(--faint)}
+.input,select.input,textarea.input{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:9px 12px;min-height:40px}
+textarea.input{min-height:80px;resize:vertical}
+.input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;background:var(--surface);flex-wrap:wrap}
+.seg button{all:unset;cursor:pointer;padding:8px 16px;font-weight:600;font-size:.9rem;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.seg button.on.no{background:var(--bad);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tabs{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;gap:2px;flex-wrap:wrap}
+.tabs button{all:unset;cursor:pointer;padding:8px 16px;border-radius:10px;font-weight:600;color:var(--fg)}
+.tabs button.on{background:var(--grad);color:#fff}
+.tabs button .n{font-weight:500;opacity:.7;margin-left:4px}
+
+/* Cards / tiles */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-pad{padding:24px}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:20px 24px 0;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:1.7fr repeat(4,1fr);gap:16px;margin-bottom:26px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);min-width:0}
+.tile .eyebrow{margin-bottom:14px}
+.tile .num{font:800 2.3rem/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.tile .sub{font-size:.85rem;color:var(--muted);margin-top:10px}
+.tile.hero{background:var(--hero);color:var(--hero-fg);border-color:var(--hero-line)}
+.tile.hero .eyebrow,.tile.hero .sub{color:var(--accent)}
+.tile.hero .num{font-size:3rem}
+.grid-2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px}
+
+/* Bars (pipeline-at-a-glance style) */
+.bars{display:flex;flex-direction:column;gap:14px;padding:20px 24px 24px}
+.bar-row{display:grid;grid-template-columns:minmax(110px,180px) 1fr 44px;align-items:center;gap:14px}
+.bar-row .lab{font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--grad);border-radius:5px;min-width:2px}
+.bar-row .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* Tables */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th{font:600 .72rem/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--surface-2)}
+.pname{font-weight:600}
+.psub{font-size:.82rem;color:var(--muted)}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:.8rem;font-weight:600;white-space:nowrap;background:var(--surface-2);color:var(--muted)}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.8}
+.pill.plain::before{display:none}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.info{background:var(--info-soft);color:var(--info)}
+.pill.accent{background:var(--accent-soft);color:var(--accent)}
+
+/* Workspace */
+.ws{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+.pt-card{background:var(--hero);color:var(--hero-fg);border:1px solid var(--hero-line);border-radius:var(--r);padding:22px 24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-bottom:20px}
+.pt-card .eyebrow{color:var(--accent);margin-bottom:6px}
+.pt-card .val{font-weight:600;font-size:1.02rem;overflow-wrap:anywhere}
+.pt-card .val.big{font:700 1.3rem/1.2 var(--f-display)}
+.stepper{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.stepper button{all:unset;cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 12px 7px 7px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:.84rem;font-weight:600;color:var(--muted);white-space:nowrap}
+.stepper button .dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);font-size:.75rem;font-variant-numeric:tabular-nums}
+.stepper button.on{border-color:var(--accent);color:var(--fg)}
+.stepper button.on .dot{background:var(--accent);color:var(--accent-fg)}
+.stepper button.done .dot{background:var(--good-soft);color:var(--good)}
+.step-card{padding:26px}
+.step-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap}
+.step-goal{color:var(--muted);margin-bottom:18px;max-width:68ch}
+.guide{border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);background:var(--accent-soft);border-radius:12px;padding:16px 18px;margin-bottom:20px}
+.guide-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.guide-head b{font-family:var(--f-display);color:var(--accent);font-size:.92rem;display:flex;gap:8px;align-items:center}
+.guide-head svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.guide ol,.guide ul{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+.guide .why{font-size:.9rem;color:var(--muted);margin-top:10px}
+.guide .kb-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{all:unset;cursor:pointer;font-size:.8rem;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--line-strong);color:var(--accent)}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.guide-collapsed{display:flex;justify-content:space-between;align-items:center;border:1px dashed var(--line-strong);border-radius:12px;padding:10px 14px;margin-bottom:20px;font-size:.88rem;color:var(--muted)}
+.checklist{display:flex;flex-direction:column;gap:2px;margin-bottom:22px}
+.checklist .eyebrow{margin-bottom:8px}
+.check{display:flex;gap:12px;align-items:flex-start;padding:9px 10px;border-radius:10px;cursor:pointer}
+.check:hover{background:var(--surface-2)}
+.check input{appearance:none;width:20px;height:20px;border:1.5px solid var(--line-strong);border-radius:6px;flex:none;margin-top:1px;display:grid;place-items:center;background:var(--surface);cursor:pointer}
+.check input:checked{background:var(--good);border-color:var(--good)}
+.check input:checked::after{content:"";width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.check.done span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px}
+.fields .full{grid-column:1/-1}
+.step-nav{display:flex;justify-content:space-between;gap:10px;margin-top:26px;padding-top:20px;border-top:1px solid var(--line);flex-wrap:wrap}
+.suggest{border-radius:12px;padding:16px 18px;border:1px solid var(--line);background:var(--surface-2);display:flex;flex-direction:column;gap:8px}
+.suggest .s-status{font:800 1.25rem/1.2 var(--f-display)}
+.suggest.good{background:var(--good-soft);border-color:transparent}
+.suggest.good .s-status{color:var(--good)}
+.suggest.bad{background:var(--bad-soft);border-color:transparent}
+.suggest.bad .s-status{color:var(--bad)}
+.suggest.warn{background:var(--warn-soft);border-color:transparent}
+.suggest.warn .s-status{color:var(--warn)}
+.note-box{font-family:var(--f-mono);font-size:.82rem;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.aside-stack{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px}
+.aside-stack .card{padding:18px 20px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:.88rem}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}
+.qa-flag{background:var(--bad-soft);color:var(--fg);border-radius:12px;padding:14px 16px;margin-bottom:18px;border:1px solid color-mix(in srgb,var(--bad) 30%,transparent)}
+.qa-flag b{color:var(--bad)}
+
+/* Upload */
+.drop{border:2px dashed var(--line-strong);border-radius:var(--r);padding:30px;text-align:center;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop svg{width:34px;height:34px;stroke:var(--accent);fill:none;stroke-width:1.6;margin-bottom:6px}
+.assign-bar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:18px 24px;border-bottom:1px solid var(--line)}
+.intern-chips{display:flex;flex-wrap:wrap;gap:6px}
+.row-bad td{background:var(--bad-soft)}
+
+/* Progress */
+.milestones{display:flex;flex-direction:column;gap:14px}
+.ms{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center}
+.ms .ico{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--muted);font-weight:700;font-size:.8rem}
+.ms.done .ico{background:var(--good-soft);color:var(--good)}
+.ms .track{margin-top:6px}
+
+/* KB drawer */
+.scrim{position:fixed;inset:0;background:rgba(6,20,20,.38);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.kb{position:fixed;top:0;right:0;bottom:0;width:min(760px,100%);background:var(--bg);z-index:50;transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.18);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.kb.on{transform:none}
+.kb-head{padding:20px 24px 14px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.kb-head-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.kb-search{position:relative}
+.kb-search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:var(--muted);fill:none;stroke-width:2}
+.kb-search .input{padding-left:38px}
+.kb-cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.kb-cats .chip{white-space:nowrap}
+.kb-body{flex:1;overflow-y:auto;padding:20px 24px 40px}
+.kb-list{display:flex;flex-direction:column;gap:8px}
+.kb-item{all:unset;cursor:pointer;display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kb-item:hover{border-color:var(--accent)}
+.kb-item b{font-family:var(--f-display);display:block;margin-bottom:2px}
+.kb-item span{font-size:.86rem;color:var(--muted)}
+.kb-item:focus-visible{outline:2px solid var(--accent)}
+.kb-article{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:26px 28px;max-width:72ch}
+.kb-article h2{margin-bottom:6px}
+.kb-article h4{font-size:.95rem;margin:20px 0 6px}
+.kb-article p,.kb-article li{color:var(--fg)}
+.kb-article p+p{margin-top:10px}
+.kb-article ul,.kb-article ol{padding-left:20px;display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.kb-article table{margin:10px 0;font-size:.85rem}
+.kb-article th,.kb-article td{padding:8px 10px;border:1px solid var(--line)}
+.kb-article .callout{background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin:12px 0;font-size:.92rem}
+.kb-article .callout.warn{background:var(--warn-soft)}
+.kb-article .team{background:var(--orange-soft);border-radius:10px;padding:10px 14px;margin:12px 0;font-size:.88rem}
+.kb-article dl{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:10px 16px;margin:10px 0}
+.kb-article dt{font-weight:700}
+.kb-article dd{margin:0;color:var(--fg)}
+.kb-fab{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;align-items:center;gap:8px;background:var(--grad);color:#fff;border:0;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer;box-shadow:0 8px 24px rgba(14,52,53,.35)}
+.kb-fab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.kbd{font-family:var(--f-mono);font-size:.72rem;border:1px solid rgba(255,255,255,.35);border-radius:5px;padding:1px 5px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--side);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;z-index:60;opacity:0;transition:.2s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.toast.err{background:var(--bad)}
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty h3{color:var(--fg);margin-bottom:6px}
+.inline-confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--warn-soft);border-radius:10px;padding:8px 12px;font-size:.9rem}
+.loading{padding:60px;text-align:center;color:var(--muted)}
+.spacer{height:20px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+@media (max-width:1100px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tile.hero{grid-column:1/-1}
+  .ws{grid-template-columns:minmax(0,1fr)}
+  .aside-stack{position:static}
+  .grid-2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;inset:0 auto 0 0;width:280px;z-index:45;transform:translateX(-100%);transition:transform .25s;height:100%;padding-top:env(safe-area-inset-top,0px)}
+  .side.on{transform:none}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+  .main{padding-block:18px 90px}
+  .pt-card{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fields{grid-template-columns:minmax(0,1fr)}
+  .bar-row{grid-template-columns:96px 1fr 36px}
+  .step-card{padding:20px}
+  .kb-fab .lbl{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+</style>
+<div class="app">
+  <aside class="side" id="side" aria-label="Navigation"></aside>
+  <main class="main" id="main"></main>
+</div>
+<button class="kb-fab" data-act="kb" aria-label="Open knowledge base"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 21.5V4.5M8 7h8M8 11h6"/></svg><span class="lbl">Knowledge base</span> <span class="kbd lbl">/</span></button>
+<div class="scrim" id="scrim"></div>
+<section class="kb" id="kb" aria-label="Knowledge base" aria-hidden="true"></section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* =====================================================================
+   KNOWLEDGE BASE — edit freely. Each article: id, cat, title, summary, tags, body (HTML).
+   Boxes with class="team" mark team-specific rules your manager should confirm or edit.
+   ===================================================================== */
+var KB_CATS = ['Start here','Decision-making','Workflow','Payers & plans','Services','Documentation','Glossary'];
+var KB = [
+{id:'what-is-ibv',cat:'Start here',title:'What insurance verification is (and why it matters)',summary:'Eligibility vs. benefits, and what happens when we get it wrong.',tags:'eligibility benefits ibv basics purpose denial',body:`
+<p><b>Eligibility verification</b> answers: <i>does this patient have active coverage with this payer on the date of service?</i></p>
+<p><b>Benefits verification</b> goes further: <i>what does the plan cover for this specific service, with this provider, and what will the patient owe?</i></p>
+<div class="callout">Every verification you complete decides whether a provider sees the patient, so it directly protects the clinic from denied claims and protects the patient from surprise bills.</div>
+<h4>What a complete verification confirms</h4>
+<ol><li>The right patient (name + DOB match exactly)</li><li>The policy is active on the DOS</li><li>The rendering provider is in network (contracted) with that plan</li><li>The patient is not on hospice (or the hospice rule is applied)</li><li>The service is covered and frequency limits are met</li><li>An approval status is chosen using the Decision Matrix</li><li>TEBRA is updated: case name, verification note, alerts</li></ol>
+<h4>Top reasons claims deny for eligibility</h4>
+<ul><li>Coverage terminated before the DOS</li><li>Wrong payer or plan on file (e.g., Medicare on file but patient switched to a Medicare Advantage plan)</li><li>Provider out of network for that specific plan</li><li>Frequency limit exceeded (e.g., AWV billed within 12 months of the last one)</li><li>Patient elected hospice</li></ul>`},
+
+{id:'shift-checklist',cat:'Start here',title:'Start-of-shift checklist',summary:'Five things to do before your first account.',tags:'checklist shift start daily routine',body:`
+<ol><li>Open the Verify Desk and check <b>My Queue</b> for today's accounts and any <b>Returned by QA</b> items. Fix returns first.</li>
+<li>Log in to TEBRA and to the payer portals you use most. Keep them open in tabs.</li>
+<li>Have the Decision Matrix open (Knowledge Base &gt; Decision-making).</li>
+<li>Work oldest-first. Unfinished accounts from yesterday carry over to today's queue.</li>
+<li>When you are stuck for more than 10 minutes on one account, mark it <b>Escalate</b> with a clear comment and move on.</li></ol>
+<div class="team">Team rule: confirm with your manager the daily target and the cut-off time for submitting.</div>`},
+
+{id:'decision-matrix',cat:'Decision-making',title:'The Decision Matrix',summary:'How each approval status is reached. The tool suggests one; you confirm it.',tags:'decision matrix approval status rules good to schedule out of network group billing self pay',body:`
+<p>This is the Decision Matrix from the verification template. Read across a row: when every condition matches, that row's status applies. <b>N/A</b> means the condition does not affect the outcome.</p>
+<div class="table-wrap"><table><thead><tr><th>Approval status</th><th>Policy active</th><th>Provider INN</th><th>Hospice</th><th>Group billing allowed</th><th>Self-pay agreement signed</th></tr></thead><tbody>
+<tr><td><b>Good to Schedule</b></td><td>Yes</td><td>Yes</td><td>No</td><td>N/A</td><td>N/A</td></tr>
+<tr><td><b>Provider out of Network</b></td><td>Yes</td><td>No</td><td>No</td><td>N/A</td><td>N/A</td></tr>
+<tr><td><b>Ok for Group Billing</b></td><td>Yes</td><td>No</td><td>Yes</td><td>Yes</td><td>N/A</td></tr>
+<tr><td><b>Deceased</b></td><td colspan="5">Applies regardless of other answers</td></tr>
+<tr><td><b>Policy Not Active</b></td><td>No</td><td>N/A</td><td>N/A</td><td>N/A</td><td>No</td></tr>
+<tr><td><b>Approved for Self Pay</b></td><td>No</td><td>N/A</td><td>N/A</td><td>N/A</td><td>Yes</td></tr>
+<tr><td><b>No self pay agreement</b></td><td>No</td><td>N/A</td><td>N/A</td><td>N/A</td><td>No</td></tr>
+<tr><td><b>Frequency Requirement Not Met</b></td><td colspan="5">Applies when the service's frequency limit is not met</td></tr>
+</tbody></table></div>
+<h4>Order the tool checks in</h4>
+<ol><li>Deceased → <b>Deceased</b></li><li>Patient inactive in TEBRA → <b>TEBRA INACTIVE</b></li><li>Policy not active → self-pay branch</li><li>Frequency not met → <b>Frequency Requirement Not Met</b></li><li>TCM service not covered → <b>No TCM Coverage</b></li><li>Network + hospice + group billing → the matching row</li><li>Nothing matches → <b>ON HOLD</b> and escalate</li></ol>
+<div class="team">Team rule to confirm: "Policy Not Active" and "No self pay agreement" share the same conditions in the matrix. The tool uses <b>No self pay agreement</b> when a self-pay agreement was requested and is not signed, and <b>Policy Not Active</b> when self-pay has not been discussed yet.</div>`},
+
+{id:'statuses',cat:'Decision-making',title:'Approval status definitions',summary:'What each of the 11 statuses means and when to use it.',tags:'approval status definitions on hold tebra inactive tcm deceased',body:`
+<dl>
+<dt>Good to Schedule</dt><dd>Active policy, provider in network, patient not in hospice. The visit can be booked.</dd>
+<dt>Provider out of Network</dt><dd>Active policy, but the rendering provider is not contracted with this plan, and no exception applies.</dd>
+<dt>Ok for Group Billing</dt><dd>Provider is not individually in network, but the payer allows the service to be billed under the group, per the matrix conditions.</dd>
+<dt>Policy Not Active</dt><dd>No active coverage on the DOS, and self-pay has not been arranged.</dd>
+<dt>Approved for Self Pay</dt><dd>No active coverage, but the patient signed a self-pay agreement.</dd>
+<dt>No self pay agreement</dt><dd>No active coverage, and a self-pay agreement was requested but is not signed.</dd>
+<dt>Deceased</dt><dd>The payer response, TEBRA, or the practice shows a date of death.</dd>
+<dt>Frequency Requirement Not Met</dt><dd>The service was already performed within its allowed frequency window (e.g., AWV in the last 12 months).</dd>
+<dt>TEBRA INACTIVE</dt><dd>The patient record is inactive in TEBRA. Do not verify further; flag it.</dd>
+<dt>No TCM Coverage</dt><dd>The service is Transitional Care Management and the plan does not cover it (or another provider already billed TCM for this discharge).</dd>
+<dt>ON HOLD</dt><dd>You cannot finish: conflicting information, payer unreachable, or no matrix rule fits. Always add a comment saying what is missing.</dd>
+</dl>`},
+
+{id:'when-escalate',cat:'Decision-making',title:'When to escalate vs. decide yourself',summary:'Clear lines for when a case goes to your manager.',tags:'escalate on hold manager stuck unsure',body:`
+<h4>Decide yourself</h4><ul><li>The answers match one row of the Decision Matrix</li><li>TEBRA eligibility and the payer portal agree</li></ul>
+<h4>Escalate (mark ON HOLD + Escalate)</h4><ul><li>TEBRA and the payer portal disagree, and a call did not resolve it</li><li>The patient has two active policies and you cannot tell which is primary</li><li>Hospice is Yes but no matrix row fits</li><li>The payer rep gives an answer that contradicts the portal</li><li>You spent more than 10 minutes and are not closer to an answer</li></ul>
+<div class="callout">A good escalation comment says what you checked, what you found, and what is unclear. Example: <i>"TEBRA 271 shows active, Availity shows term 08/31. Called Humana, 25-min hold, disconnected. Need guidance on which to trust."</i></div>`},
+
+{id:'sources',cat:'Workflow',title:'Where to verify: TEBRA, portal, or call',summary:'Start fast, escalate to slower sources only when needed.',tags:'tebra portal call availity source workflow order',body:`
+<ol><li><b>TEBRA eligibility check</b> (fastest). Run it on the patient's policy. It sends an electronic 270 inquiry and returns a 271 response.</li>
+<li><b>Payer website / portal</b> when the 271 is missing details, shows an error, or does not show network status or hospice. Many payers use Availity; others have their own portals.</li>
+<li><b>Call the payer</b> when the portal cannot answer, or the answers conflict. Always record the rep's name and a call reference number.</li></ol>
+<div class="callout warn">A 271 that says "active" does not confirm the provider is in network. Network status usually needs the portal, the practice's contract list, or a call.</div>`},
+
+{id:'eligibility-271',cat:'Workflow',title:'Reading an eligibility (271) response',summary:'Which fields to look at and the traps to avoid.',tags:'271 270 eligibility response effective termination date active coverage',body:`
+<h4>Look for</h4><ul><li><b>Coverage status</b>: Active / Inactive</li><li><b>Effective date</b> and <b>termination date</b>: the DOS must fall between them</li><li><b>Plan name and type</b> (HMO, PPO, Medicare Advantage, Medicaid)</li><li><b>Other payer / COB</b> info that may make this plan secondary</li><li><b>Hospice</b> or <b>Medicare Advantage</b> segments on Medicare responses</li></ul>
+<h4>Traps</h4><ul><li>Checking today's date instead of the DOS</li><li>Treating a Medicare "active" response as final when the patient has a Medicare Advantage plan listed: the MA plan is the payer to verify</li><li>Name or DOB mismatches: re-run with the exact spelling on the card</li></ul>`},
+
+{id:'payer-call',cat:'Workflow',title:'Payer call script',summary:'What to have ready, what to ask, and what to write down.',tags:'call script payer phone rep reference questions',body:`
+<h4>Have ready</h4><ul><li>Provider name, NPI, and Tax ID</li><li>Patient name, DOB, member ID</li><li>Date of service and type of service (CPT if known)</li></ul>
+<h4>Ask</h4><ol><li>"Is the policy active for date of service ___?" (get effective/term dates)</li><li>"Is Dr. ___, NPI ___, in network for this member's plan?"</li><li>"Is there a hospice election on file?"</li><li>"Is [service] covered? Any frequency limit, and when was it last billed?"</li><li>"Is a referral or prior authorization required?"</li><li>"What is the patient's copay / coinsurance / remaining deductible?"</li></ol>
+<h4>Before you hang up</h4><p>Get the <b>rep's name</b> and a <b>call reference number</b>. Enter both in the Reference field.</p>
+<div class="callout">HIPAA minimum necessary: share only the patient details needed to identify the member.</div>`},
+
+{id:'network',cat:'Workflow',title:'Checking network (contracted) status',summary:'INN vs. OON, and why "the payer" is not enough.',tags:'network contracted inn oon in network out of network credentialing npi',body:`
+<p>A provider can be in network with a payer's PPO but not its HMO, or with commercial plans but not Medicare Advantage. Always check the <b>specific plan</b>.</p>
+<ul><li>Use the rendering provider's individual NPI (Type 1) and the group's NPI/Tax ID (Type 2)</li><li>Check the payer's provider directory or portal, or call</li><li>Credentialing in progress is <b>not</b> in network</li></ul>
+<div class="team">Team rule: ask your manager for the practice's current contracted-plans list per provider. The QA team has flagged cases like "provider is credentialed under the group" as considerations, so check both individual and group.</div>`},
+
+{id:'hospice',cat:'Workflow',title:'Hospice check',summary:'Why hospice changes everything, and how to find it.',tags:'hospice election medicare alert benefit period',body:`
+<p>When a Medicare patient elects hospice, the hospice is responsible for care related to the terminal illness. Visits by other providers may not be payable unless they are unrelated to the terminal condition or the provider is the patient's designated attending physician.</p>
+<h4>How to check</h4><ul><li>Medicare eligibility responses show hospice election periods (start date, hospice provider)</li><li>For Medicare Advantage members, still check Medicare: hospice is generally billed to Original Medicare even for MA members</li><li>If the portal is unclear, call</li></ul>
+<h4>If hospice = Yes</h4><ul><li>Note the hospice start date and hospice name in your comment</li><li>Update the <b>hospice alert</b> in TEBRA. This is one of the most common QA fails.</li><li>Apply the Decision Matrix (group billing row) or escalate</li></ul>`},
+
+{id:'cob',cat:'Payers & plans',title:'Primary vs. secondary (coordination of benefits)',summary:'Which plan pays first.',tags:'cob coordination primary secondary medicare secondary payer msp',body:`
+<ul><li>The <b>primary</b> payer pays first; the <b>secondary</b> pays some of what is left.</li><li>Medicare is usually primary for patients 65+ who are retired.</li><li>If a patient 65+ has group health coverage through their own or their spouse's <b>current</b> employment with 20+ employees, the employer plan is usually primary and Medicare secondary.</li><li>Medicaid is almost always the payer of last resort (secondary).</li></ul>
+<p>Verify the <b>primary</b> plan in this tool. Mention a secondary plan in the comment.</p>`},
+
+{id:'plan-types',cat:'Payers & plans',title:'Plan types at a glance',summary:'HMO, PPO, EPO, POS, Medicare, MA, Medigap, Medicaid.',tags:'hmo ppo epo pos medicare advantage medigap medicaid dsnp plan types',body:`
+<div class="table-wrap"><table><thead><tr><th>Plan</th><th>Network rules</th><th>Watch for</th></tr></thead><tbody>
+<tr><td><b>HMO</b></td><td>In network only (except emergencies)</td><td>PCP assignment, referrals</td></tr>
+<tr><td><b>PPO</b></td><td>Out of network allowed at higher cost</td><td>Separate OON deductible</td></tr>
+<tr><td><b>EPO</b></td><td>In network only, usually no referral</td><td>OON not covered</td></tr>
+<tr><td><b>POS</b></td><td>Hybrid; PCP and referrals for best rate</td><td>Referral rules</td></tr>
+<tr><td><b>Original Medicare</b> (Parts A &amp; B)</td><td>Any provider that accepts Medicare</td><td>MBI number, frequency limits</td></tr>
+<tr><td><b>Medicare Advantage</b> (Part C)</td><td>Private plan replaces Original Medicare; HMO/PPO networks</td><td>Verify with the MA plan, not Medicare</td></tr>
+<tr><td><b>Medigap</b> (supplement)</td><td>Pays after Original Medicare</td><td>Secondary only; not an MA plan</td></tr>
+<tr><td><b>Medicaid / Managed Medicaid</b></td><td>State program, often via MCOs</td><td>Payer of last resort; monthly eligibility</td></tr>
+<tr><td><b>D-SNP</b></td><td>MA plan for dual-eligible (Medicare + Medicaid)</td><td>Both coverages apply</td></tr>
+</tbody></table></div>`},
+
+{id:'cost-share',cat:'Payers & plans',title:'Deductible, copay, coinsurance, out-of-pocket max',summary:'What the patient owes, in plain terms.',tags:'deductible copay coinsurance oop out of pocket maximum allowed amount',body:`
+<dl><dt>Allowed amount</dt><dd>The maximum the plan pays an in-network provider for a service.</dd>
+<dt>Deductible</dt><dd>What the patient pays each plan year before the plan starts paying.</dd>
+<dt>Copay</dt><dd>A fixed amount per visit (e.g., $25).</dd>
+<dt>Coinsurance</dt><dd>A percentage of the allowed amount the patient pays after the deductible (e.g., 20%).</dd>
+<dt>Out-of-pocket max</dt><dd>Once reached, the plan pays 100% of covered services for the rest of the plan year.</dd></dl>
+<div class="callout">Example: allowed amount $200, deductible met, 20% coinsurance → patient owes $40, plan pays $160.</div>`},
+
+{id:'svc-awv',cat:'Services',title:'Annual Wellness Visit (AWV) and IPPE',summary:'Frequency rules that cause the most denials.',tags:'awv annual wellness visit ippe welcome to medicare g0438 g0439 g0402 frequency',body:`
+<ul><li><b>IPPE</b> ("Welcome to Medicare", G0402): once, within the first 12 months of Part B.</li><li><b>Initial AWV</b> (G0438): once, after the first 12 months of Part B, and not within 12 months of an IPPE.</li><li><b>Subsequent AWV</b> (G0439): once every 12 months (11 full months must pass after the last one).</li></ul>
+<p>Check the last AWV date in the portal (often shown as "preventive services eligibility"). If it is too soon → <b>Frequency Requirement Not Met</b>.</p>`},
+
+{id:'svc-tcm',cat:'Services',title:'Transitional Care Management (TCM)',summary:'Post-discharge care: timing rules and coverage.',tags:'tcm transitional care management 99495 99496 discharge',body:`
+<ul><li>CPT <b>99495</b> (moderate complexity, face-to-face visit within 14 days) and <b>99496</b> (high complexity, within 7 days).</li><li>Interactive contact with the patient within 2 business days of discharge.</li><li>Covers a 30-day period starting on the discharge date. Only one provider can bill TCM for that period.</li></ul>
+<p>If the plan does not cover TCM, or another provider already billed it for this discharge → <b>No TCM Coverage</b>.</p>`},
+
+{id:'svc-other',cat:'Services',title:'Other common service types',summary:'CCM, RPM, office visits, telehealth.',tags:'ccm chronic care management rpm remote patient monitoring telehealth office visit e/m',body:`
+<dl><dt>CCM (Chronic Care Mgmt)</dt><dd>Monthly care management for patients with 2+ chronic conditions. Needs patient consent; check that no other provider bills CCM the same month.</dd>
+<dt>RPM (Remote Monitoring)</dt><dd>Device-based monitoring billed monthly. Check plan coverage, especially for commercial plans.</dd>
+<dt>Office / home visit (E/M)</dt><dd>Standard visit. Check copay and whether a referral is needed (HMO).</dd>
+<dt>Telehealth</dt><dd>Coverage varies by payer and plan. Confirm telehealth is covered for this service.</dd></dl>
+<div class="team">Team rule: ask your manager for the full list of service types your team verifies and any payer-specific rules.</div>`},
+
+{id:'note-format',cat:'Documentation',title:'TEBRA documentation: case name, note, alerts',summary:'The three updates QA checks on every account.',tags:'notes documentation case name alert vac qa tebra update',body:`
+<ol><li><b>Case name</b>: update it so it reflects the current verified plan.</li><li><b>Verification note</b>: paste the note the tool generates (Step 8 has a Copy button). It includes date, source, plan, member ID, eligibility, network, hospice, reference, and status.</li><li><b>Alerts</b>: if the patient is in hospice, update the hospice alert.</li></ol>
+<div class="callout warn">The most frequent QA findings in this program are "Notes not updated (VAC)" and "Pt hospice alert not updated". Do all three updates in TEBRA <i>before</i> you tick them here.</div>
+<div class="team">Team rule: replace the note template in Step 8 with your team's exact VAC note format if it differs.</div>`},
+
+{id:'qa',cat:'Documentation',title:'How QA reviews your work',summary:'What gets checked, and how returns work.',tags:'qa quality passed failed return review',body:`
+<p>A QA reviewer re-checks a sample (or all) of your completed accounts. Each gets <b>PASSED</b> or <b>FAILED</b> with a comment.</p>
+<ul><li>A FAILED account returns to your queue under <b>Returned by QA</b>. Fix it, then submit again.</li><li>Your <b>My Progress</b> page shows your pass rate and your most common findings, with links to the articles that help.</li></ul>`},
+
+{id:'glossary',cat:'Glossary',title:'Glossary A–Z',summary:'Quick definitions for terms you will hear daily.',tags:'glossary terms definitions npi tin mbi prior auth referral',body:`
+<dl>
+<dt>270 / 271</dt><dd>Electronic eligibility inquiry (270) and response (271) under HIPAA X12 standards.</dd>
+<dt>Availity</dt><dd>A multi-payer portal many commercial and Medicare Advantage payers use for eligibility.</dd>
+<dt>Clearinghouse</dt><dd>A service that routes electronic transactions (claims, eligibility) between providers and payers.</dd>
+<dt>COB</dt><dd>Coordination of Benefits: rules deciding primary vs. secondary payer.</dd>
+<dt>Credentialing</dt><dd>The payer's process of approving a provider to join its network.</dd>
+<dt>DOS</dt><dd>Date of service.</dd>
+<dt>Effective / term date</dt><dd>The dates coverage starts and ends.</dd>
+<dt>INN / OON</dt><dd>In network / out of network.</dd>
+<dt>MBI</dt><dd>Medicare Beneficiary Identifier: the 11-character ID on a Medicare card.</dd>
+<dt>NPI</dt><dd>National Provider Identifier. Type 1 = individual provider; Type 2 = organization/group.</dd>
+<dt>Prior authorization</dt><dd>Payer approval required before a service is performed.</dd>
+<dt>Referral</dt><dd>A PCP's order sending the patient to a specialist (common in HMOs).</dd>
+<dt>Rendering provider</dt><dd>The clinician who performs the service.</dd>
+<dt>TIN / Tax ID</dt><dd>The tax identifier the practice bills under.</dd>
+</dl>`}
+];
+
+(function(){
+'use strict';
+/* ---------------- utilities ---------------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('vdesk:' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('vdesk:' + k, JSON.stringify(v)); } catch(e){} }
+};
+const localToday = () => new Date().toLocaleDateString('en-CA');
+const fmtDay = iso => { if(!iso) return ''; const d = new Date(iso + 'T00:00:00'); return isNaN(d) ? iso : d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}); };
+const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0,2).map(x => x[0].toUpperCase()).join('');
+const IS_GAS = !!(window.google && google.script && google.script.run);
+
+function call(action, payload){
+  if (IS_GAS) return new Promise((res, rej) => google.script.run
+    .withSuccessHandler(res)
+    .withFailureHandler(e => rej(e && e.message ? e : new Error(String(e))))
+    .api(action, payload || {}));
+  return Mock.api(action, payload || {});
+}
+
+const ICON = {
+  queue:'<path d="M4 6h16M4 12h16M4 18h10"/>',
+  board:'<path d="M3 10.5 12 3l9 7.5V21H3z"/><path d="M9 21v-7h6v7"/>',
+  upload:'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/>',
+  qa:'<path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
+  progress:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  kb:'<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 21.5V4.5M8 7h8M8 11h6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  bulb:'<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 18v-6M9 15l3 3 3-3"/>'
+};
+const ic = (n, cls) => `<svg viewBox="0 0 24 24" aria-hidden="true"${cls ? ` class="${cls}"` : ''}>${ICON[n]}</svg>`;
+
+let toastT;
+function toast(msg, err){
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', err ? 5200 : 2600);
+}
+const fail = e => toast((e && e.message) || String(e), true);
+
+/* ---------------- field + step definitions ---------------- */
+const isTCM = r => /tcm|transitional/i.test((r && r.tos) || '');
+const F = {
+  tebraActive: {label:'Patient record active in TEBRA?', type:'yn', helper:true},
+  deceased:    {label:'Date of death on file?', type:'yn', helper:true, invert:true},
+  plan:        {label:'Insurance plan', type:'text', ph:'e.g., Humana Gold Plus HMO'},
+  memberId:    {label:'Member ID', type:'text', ph:'Exactly as on the card'},
+  dos:         {label:'Date of service (DOS)', type:'text', ph:'MM/DD/YYYY'},
+  source:      {label:'Verified via', type:'select', opts:['TEBRA','Payer portal','Payer call','Clearinghouse']},
+  eligibility: {label:'Policy active on the DOS?', type:'yn'},
+  reference:   {label:'Reference # / rep name', type:'text', ph:'Required when you call', show:d => d.source !== 'TEBRA'},
+  contracted:  {label:'Provider in network (contracted)?', type:'yn'},
+  groupBilling:{label:'Plan allows group billing?', type:'yn', helper:true, show:d => d.contracted === 'No'},
+  hospice:     {label:'Patient in hospice?', type:'yn', invert:true},
+  freqMet:     {label:'Frequency requirement met?', type:'ynna', helper:true},
+  tcmCovered:  {label:'TCM covered by this plan?', type:'yn', helper:true, show:(d, r) => isTCM(r)},
+  selfPay:     {label:'Self-pay agreement', type:'opts', opts:['Signed','Requested, not signed','Not discussed'], helper:true, show:d => d.eligibility === 'No'},
+  status:      {label:'Approval status', type:'status'},
+  caseName:    {label:'Case name updated in TEBRA?', type:'yn'},
+  notes:       {label:'Verification note added in TEBRA?', type:'yn'},
+  comment:     {label:'Comment', type:'textarea', full:true, ph:'Anything QA or your manager should know: secondary plan, hospice dates, conflicts…'}
+};
+const SHEET_FIELDS = ['dos','plan','contracted','eligibility','hospice','caseName','notes','comment','status','source','memberId','reference'];
+const HELPER_FIELDS = Object.keys(F).filter(k => F[k].helper);
+
+const STEPS = [
+  {key:'find', short:'Find patient', title:'Find the right patient', goal:'Confirm you have the correct patient in TEBRA before you check anything else.',
+   how:['Search TEBRA by last name + DOB, not by name alone.','Match the DOB to the assignment exactly. Watch for swapped day and month.','Check the patient status: active or inactive.','Look for a date of death or deceased flag.'],
+   why:'Verifying the wrong patient is the most expensive mistake. Every answer after it is wrong.',
+   kb:['what-is-ibv','shift-checklist'],
+   checks:['Searched by last name + DOB','DOB matches the assignment exactly','Checked patient status in TEBRA','Checked for a date of death'],
+   fields:['tebraActive','deceased']},
+  {key:'ins', short:'Insurance', title:'Identify the insurance', goal:'Find the primary plan on file and capture it exactly.',
+   how:['Open the patient\'s insurance/policy in TEBRA.','If there are two policies, work out which one is primary.','Note the plan type: Original Medicare, Medicare Advantage, Medicaid, or commercial.','Copy the member ID exactly. A single wrong character returns "not found".'],
+   why:'If the wrong plan is on file, a clean eligibility response means nothing.',
+   kb:['plan-types','cob'],
+   checks:['Identified the primary policy','Noted the plan type (Medicare / MA / Medicaid / commercial)','Copied the member ID exactly','Confirmed the DOS (or planned visit date)'],
+   fields:['plan','memberId','dos']},
+  {key:'elig', short:'Eligibility', title:'Verify eligibility', goal:'Confirm the policy is active on the date of service.',
+   how:['Run the eligibility check in TEBRA first.','Check effective and termination dates against the DOS, not today.','If the response is unclear or errors out, use the payer portal.','If the portal can\'t answer, call the payer and record the rep name and reference #.'],
+   why:'Coverage that ended last month is the most common eligibility denial.',
+   kb:['sources','eligibility-271','payer-call'],
+   checks:['Ran the TEBRA eligibility check','Compared effective/term dates to the DOS','Used the portal or a call if TEBRA was unclear','Recorded the reference # for any call'],
+   fields:['source','eligibility','reference']},
+  {key:'net', short:'Network', title:'Check provider network status', goal:'Confirm the rendering provider is contracted with this specific plan.',
+   how:['Use the rendering provider\'s NPI and the group Tax ID.','Check the specific plan (HMO vs PPO vs MA), not just the payer.','Credentialing "in progress" counts as out of network.','If out of network, check whether the plan allows group billing.'],
+   why:'An "active" eligibility response does not tell you the provider is in network.',
+   kb:['network'],
+   checks:['Checked the specific plan, not only the payer','Checked individual and group credentialing','If OON: asked about group billing'],
+   fields:['contracted','groupBilling']},
+  {key:'hosp', short:'Hospice', title:'Check for hospice', goal:'Find out whether the patient has elected hospice.',
+   how:['On Medicare responses, look for a hospice election period.','For Medicare Advantage members, still check Medicare. Hospice is generally billed to Original Medicare.','If hospice = Yes, write the start date and hospice name in your comment.'],
+   why:'"Pt hospice alert not updated" is one of the most frequent QA findings in this program.',
+   kb:['hospice'],
+   checks:['Checked for a hospice election','If yes: noted the hospice start date and name'],
+   fields:['hospice']},
+  {key:'svc', short:'Service', title:'Check coverage for this service', goal:'Make sure the scheduled service is covered and its frequency limit is met.',
+   how:['Check the type of service on the assignment.','AWV: the last one must be at least 12 months ago (11 full months).','TCM: confirm the plan covers it and no other provider billed it for this discharge.','If the policy is inactive, check whether a self-pay agreement exists.'],
+   why:'A covered patient can still be denied when a frequency limit is not met.',
+   kb:['svc-awv','svc-tcm','svc-other'],
+   checks:['Checked the frequency limit for this service','Checked the last date this service was billed'],
+   fields:['freqMet','tcmCovered','selfPay']},
+  {key:'decide', short:'Decide', title:'Choose the approval status', goal:'Apply the Decision Matrix. The tool suggests a status from your answers; you confirm it.',
+   how:['Read the suggestion and the rule that produced it.','If it matches what you found, accept it.','If no rule fits, choose ON HOLD and escalate with a clear comment.'],
+   why:'Consistency matters: two interns with the same facts should reach the same status.',
+   kb:['decision-matrix','statuses','when-escalate'],
+   checks:['Compared my answers with the Decision Matrix','Confirmed or corrected the suggested status'],
+   fields:['status']},
+  {key:'doc', short:'Document', title:'Document in TEBRA', goal:'Update TEBRA so the next person sees exactly what you verified.',
+   how:['Update the case name to reflect the verified plan.','Copy the generated verification note below and paste it into TEBRA.','If hospice = Yes, update the hospice alert.','Save in TEBRA first, then tick the boxes here.'],
+   why:'"Notes not updated (VAC)" is the most frequent QA finding. Most fails happen at this step.',
+   kb:['note-format','qa'],
+   checks:['Updated the case name','Pasted the verification note','Updated the hospice alert (if hospice = Yes)','Saved in TEBRA'],
+   fields:['caseName','notes','comment']}
+];
+
+/* ---------------- decision engine (from the Decision Matrix) ---------------- */
+function suggest(d, r){
+  const need = [];
+  if (d.deceased === 'Yes') return {status:'Deceased', tone:'bad', rule:'A date of death is on file. Deceased applies regardless of other answers.'};
+  if (d.tebraActive === 'No') return {status:'TEBRA INACTIVE', tone:'bad', rule:'The patient record is inactive in TEBRA. Flag it; no further verification needed.'};
+  if (!d.eligibility) need.push('policy active');
+  if (d.eligibility === 'No'){
+    if (d.selfPay === 'Signed') return {status:'Approved for Self Pay', tone:'warn', rule:'Policy not active + self-pay agreement signed.'};
+    if (d.selfPay === 'Requested, not signed') return {status:'No self pay agreement', tone:'bad', rule:'Policy not active + self-pay agreement requested but not signed.'};
+    return {status:'Policy Not Active', tone:'bad', rule:'Policy not active on the DOS and no self-pay agreement arranged.'};
+  }
+  if (d.freqMet === 'No') return {status:'Frequency Requirement Not Met', tone:'warn', rule:'The service\'s frequency limit is not met.'};
+  if (isTCM(r) && d.tcmCovered === 'No') return {status:'No TCM Coverage', tone:'warn', rule:'Service is TCM and the plan does not cover it.'};
+  if (!d.contracted) need.push('provider network');
+  if (!d.hospice) need.push('hospice');
+  if (need.length) return {status:null, tone:'', rule:'Answer these to get a suggestion: ' + need.join(', ') + '.'};
+  if (d.contracted === 'Yes' && d.hospice === 'No') return {status:'Good to Schedule', tone:'good', rule:'Active policy + provider in network + not in hospice.'};
+  if (d.contracted === 'No' && d.hospice === 'No') return {status:'Provider out of Network', tone:'warn', rule:'Active policy + provider out of network + not in hospice.'};
+  if (d.contracted === 'No' && d.hospice === 'Yes'){
+    if (!d.groupBilling) return {status:null, tone:'', rule:'Answer "Plan allows group billing?" in the Network step.'};
+    if (d.groupBilling === 'Yes') return {status:'Ok for Group Billing', tone:'good', rule:'Active policy + provider OON + hospice + plan allows group billing.'};
+  }
+  return {status:'ON HOLD', tone:'warn', rule:'No row in the Decision Matrix matches these answers. Mark ON HOLD and escalate with a comment.'};
+}
+const statusTone = s => !s ? '' : /good to schedule|ok for group/i.test(s) ? 'good' : /deceased|not active|no self pay|inactive/i.test(s) ? 'bad' : /hold/i.test(s) ? 'info' : 'warn';
+const workTone = w => ({'Completed':'good','In Progress':'info','Escalated':'warn','Assigned':''}[w] || '');
+
+function noteText(d, r){
+  const who = S.boot ? S.boot.me.name : '';
+  const lines = [
+    'ELIGIBILITY VERIFIED ' + new Date().toLocaleDateString('en-US'),
+    'Source: ' + (d.source || '—') + (d.reference ? ' | Ref: ' + d.reference : ''),
+    'Plan: ' + (d.plan || '—') + ' | Member ID: ' + (d.memberId || '—'),
+    'DOS: ' + (d.dos || '—') + ' | Active: ' + (d.eligibility || '—') + ' | INN: ' + (d.contracted || '—') + ' | Hospice: ' + (d.hospice || '—'),
+    'Service: ' + (r.tos || '—') + ' | Status: ' + (d.status || '—')
+  ];
+  if (d.comment) lines.push('Note: ' + d.comment);
+  lines.push('— ' + who);
+  return lines.join('\n');
+}
+
+/* ---------------- state ---------------- */
+const S = {
+  boot:null, view:'queue', date:localToday(), filter:'all',
+  guided: store.get('guided', true), hideTips: store.get('hideTips', {}),
+  queue:[], rec:null, draft:{}, step:0, checks:{}, pendingEscalate:false,
+  board:null, boardIntern:'', boardSel:new Set(),
+  up:{rows:[], date:localToday(), pick:new Set(), fileName:''},
+  qaList:[], qaSel:null, qaReason:'', stats:null,
+  kb:{open:false, cat:'All', q:'', id:null}, menu:false
+};
+const role = () => S.boot ? S.boot.me.role : 'Intern';
+const isMgr = () => role() === 'Manager';
+const canQA = () => role() === 'Manager' || role() === 'QA';
+
+/* ---------------- shell ---------------- */
+function navItems(){
+  const items = [];
+  items.push(['label','Work']);
+  if (role() === 'Intern') items.push(['queue','My Queue','queue']);
+  if (isMgr()) items.push(['board','Team Board','board'], ['upload','Upload & Assign','upload']);
+  if (canQA()) items.push(['qa','QA Review','qa']);
+  if (role() === 'QA' && !isMgr()) items.push(['board','Team Board','board']);
+  items.push(['label','Learn']);
+  items.push(['progress', role() === 'Intern' ? 'My Progress' : 'Skills & Progress','progress']);
+  items.push(['kb','Knowledge Base','kb']);
+  return items;
+}
+function renderSide(){
+  const me = S.boot.me;
+  const returned = S.queue.filter(r => /^fail/i.test(r.qa) && r.work !== 'Completed').length;
+  const nav = navItems().map(([k, label, icon]) => {
+    if (k === 'label') return `<div class="nav-label">${label}</div>`;
+    const on = S.view === k || (k === 'queue' && S.view === 'work' && role() === 'Intern') || (k === 'board' && S.view === 'work' && isMgr());
+    const cnt = k === 'queue' && returned ? `<span class="count" title="Returned by QA">${returned}</span>` : (k === 'qa' && S.qaCount ? `<span class="count">${S.qaCount}</span>` : '');
+    return `<button class="${on ? 'on' : ''}" data-nav="${k}">${ic(icon)}<span>${label}</span>${cnt}</button>`;
+  }).join('');
+  $('#side').innerHTML = `
+    <div class="brand"><span class="brand-mark">Verify Desk</span><span class="brand-name">Eligibility<br>&amp; Benefits</span></div>
+    <nav class="nav" aria-label="Main">${nav}</nav>
+    <div class="side-foot">
+      <div class="mode-switch" role="switch" tabindex="0" aria-checked="${S.guided}" data-act="toggle-guided">
+        <span class="toggle ${S.guided ? 'on' : ''}"></span>
+        <span><b>${S.guided ? 'Guided mode' : 'Express mode'}</b><small>${S.guided ? 'Step-by-step prompts on' : 'All prompts skipped'}</small></span>
+      </div>
+      ${IS_GAS ? '' : `<div><div class="nav-label" style="padding:0 0 8px">Demo: view as</div><div class="role-pick">${['Intern','Manager'].map(r => `<button data-role="${r}" class="${role() === r ? 'on' : ''}">${r}</button>`).join('')}</div></div>`}
+      <div class="me"><span class="avatar">${esc(initials(me.name))}</span><span style="min-width:0"><div class="me-name">${esc(me.name)}</div><div class="me-sub">${esc(me.role)} · ${esc(me.email)}</div></span></div>
+    </div>`;
+  $('#side').classList.toggle('on', S.menu);
+  $('#scrim').classList.toggle('on', S.menu || S.kb.open);
+}
+function shellTop(title){
+  return `<div class="topbar"><button class="btn sm" data-act="menu" aria-label="Open menu">${ic('menu')}</button><b style="font-family:var(--f-display)">${esc(title)}</b><button class="btn sm" data-act="kb" aria-label="Knowledge base">${ic('kb')}</button></div>
+  ${IS_GAS ? '' : `<div class="demo-banner"><b>Demo</b><span>Sample accounts with fictional patients. Switch between the Intern and Manager views in the sidebar. The live version runs from your Google Sheet.</span></div>`}`;
+}
+function setMain(html){ $('#main').innerHTML = html; }
+function loading(t){ setMain(shellTop(t) + '<div class="loading">Loading…</div>'); }
+
+async function go(view, opts){
+  S.view = view; S.menu = false;
+  if (view === 'kb'){ S.view = S.prevView || (role() === 'Intern' ? 'queue' : 'board'); openKB(); return; }
+  S.prevView = view;
+  renderSide();
+  try {
+    if (view === 'queue') await viewQueue();
+    else if (view === 'board') await viewBoard();
+    else if (view === 'upload') viewUpload();
+    else if (view === 'qa') await viewQA();
+    else if (view === 'progress') await viewProgress();
+    else if (view === 'work') await openRecord(opts.id);
+  } catch(e){ fail(e); }
+  renderSide();
+  window.scrollTo(0, 0);
+}
+
+/* ---------------- tiles / tables ---------------- */
+const tile = (label, num, sub, hero) => `<div class="tile${hero ? ' hero' : ''}"><div class="eyebrow">${label}</div><div class="num">${num}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+const pill = (txt, tone, plain) => txt ? `<span class="pill ${tone || ''}${plain ? ' plain' : ''}">${esc(txt)}</span>` : '<span class="muted">—</span>';
+function bars(entries, emptyMsg){
+  if (!entries.length) return `<div class="empty" style="padding:28px">${emptyMsg}</div>`;
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  return `<div class="bars">${entries.map(([l, v, sub]) => `<div class="bar-row"><span class="lab" title="${esc(l)}">${esc(l)}</span><span class="track"><i style="width:${(v / max * 100).toFixed(1)}%"></i></span><span class="v">${sub != null ? sub : v}</span></div>`).join('')}</div>`;
+}
+
+/* ---------------- intern: queue ---------------- */
+async function viewQueue(){
+  loading('My Queue');
+  const [q, st] = await Promise.all([call('queue', {date:S.date, includeOpen:true}), call('stats', {})]);
+  S.queue = q; S.stats = st;
+  const returned = q.filter(r => /^fail/i.test(r.qa) && r.work !== 'Completed');
+  const todo = q.filter(r => r.work === 'Assigned');
+  const prog = q.filter(r => r.work === 'In Progress' || r.work === 'Escalated');
+  const done = q.filter(r => r.work === 'Completed');
+  const passRate = st.qaReviewed ? Math.round(st.qaPassed / st.qaReviewed * 100) + '%' : '—';
+  const groups = {all:q, returned, todo, prog, done};
+  const list = groups[S.filter] || q;
+  const next = returned[0] || prog[0] || todo[0];
+  setMain(shellTop('My Queue') + `
+    <div class="page-head"><div><h1>Good ${greet()}, ${esc(S.boot.me.name.split(' ')[0])}</h1><p>${fmtDay(S.date)} · ${q.length} account${q.length === 1 ? '' : 's'} in your queue</p></div>
+      <div class="head-actions"><input type="date" id="qdate" class="input" value="${S.date}" aria-label="Queue date" style="width:auto">
+      ${next ? `<button class="btn primary" data-open="${next.id}">${returned.includes(next) ? 'Fix returned account' : next.work === 'Assigned' ? 'Start next account' : 'Continue working'} →</button>` : ''}</div></div>
+    <div class="tiles">
+      ${tile('Accounts in queue', q.length, done.length + ' of ' + q.length + ' completed', true)}
+      ${tile('To do', todo.length)}${tile('In progress', prog.length)}${tile('Completed', done.length)}${tile('QA pass rate', passRate, st.qaReviewed + ' reviewed')}
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="tabs" role="tablist">${[['all','All'],['returned','Returned by QA'],['todo','To do'],['prog','In progress'],['done','Done']].map(([k, l]) => `<button role="tab" aria-selected="${S.filter === k}" class="${S.filter === k ? 'on' : ''}" data-filter="${k}">${l}<span class="n">${groups[k].length}</span></button>`).join('')}</div></div>
+      ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Patient</th><th>Provider</th><th>Service</th><th>Work</th><th>Approval status</th><th>QA</th><th></th></tr></thead><tbody>
+      ${list.map(r => `<tr class="click" data-open="${r.id}"><td><div class="pname">${esc(r.patient)}</div><div class="psub mono">DOB ${esc(r.dob)}</div></td><td>${esc(r.provider)}</td><td>${esc(r.tos)}</td><td>${pill(r.work, workTone(r.work))}${r.assignedOn < S.date && r.work !== 'Completed' ? '<div class="psub">Carried over</div>' : ''}</td><td>${pill(r.status, statusTone(r.status), true)}</td><td>${r.qa ? pill(/^pass/i.test(r.qa) ? 'Passed' : 'Returned', /^pass/i.test(r.qa) ? 'good' : 'bad') : '<span class="muted">—</span>'}</td><td style="text-align:right"><button class="btn sm" data-open="${r.id}">${r.work === 'Completed' ? 'View' : r.work === 'Assigned' ? 'Start' : 'Continue'}</button></td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty"><h3>${S.filter === 'all' ? 'No accounts assigned for this date' : 'Nothing here'}</h3><p>${S.filter === 'all' ? 'Your manager assigns accounts each morning. Meanwhile, browse the Knowledge Base.' : 'Try another tab.'}</p></div>`}
+    </div>`);
+}
+const greet = () => { const h = new Date().getHours(); return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'; };
+
+/* ---------------- workspace ---------------- */
+async function openRecord(id){
+  loading('Verify');
+  let r = (role() === 'Intern') ? await call('start', {id}) : await call('record', {id});
+  S.rec = r; S.pendingEscalate = false;
+  const helpers = store.get('helpers:' + id, {});
+  S.draft = Object.assign({}, helpers);
+  SHEET_FIELDS.forEach(k => { S.draft[k] = r[k] || ''; });
+  if (!S.draft.source) S.draft.source = 'TEBRA';
+  S.checks = store.get('checks:' + id, {});
+  S.step = store.get('step:' + id, 0);
+  renderWork();
+}
+const readOnly = () => S.rec && (S.rec.work === 'Completed' && role() === 'Intern' || (role() !== 'Intern' && S.rec.internEmail !== S.boot.me.email));
+function persistLocal(){
+  const h = {}; HELPER_FIELDS.forEach(k => { if (S.draft[k]) h[k] = S.draft[k]; });
+  store.set('helpers:' + S.rec.id, h); store.set('checks:' + S.rec.id, S.checks); store.set('step:' + S.rec.id, S.step);
+}
+
+function fieldHTML(k){
+  const f = F[k], d = S.draft, v = d[k] || '', ro = readOnly();
+  if (f.show && !f.show(d, S.rec)) return '';
+  const id = 'f_' + k;
+  let ctl;
+  if (f.type === 'yn' || f.type === 'ynna'){
+    const opts = f.type === 'ynna' ? ['Yes','No','N/A'] : ['Yes','No'];
+    ctl = `<div class="seg" role="radiogroup" aria-label="${esc(f.label)}" id="${id}">${opts.map(o => {
+      const bad = (o === 'No' && !f.invert) || (o === 'Yes' && f.invert);
+      return `<button type="button" role="radio" aria-checked="${v === o}" ${ro ? 'disabled' : ''} class="${v === o ? 'on' + (bad ? ' no' : '') : ''}" data-set="${k}" data-val="${o}">${o}</button>`;}).join('')}</div>`;
+  } else if (f.type === 'opts'){
+    ctl = `<div class="intern-chips" id="${id}">${f.opts.map(o => `<button type="button" class="chip ${v === o ? 'on' : ''}" ${ro ? 'disabled' : ''} data-set="${k}" data-val="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+  } else if (f.type === 'select' || f.type === 'status'){
+    const opts = f.type === 'status' ? S.boot.statuses : f.opts;
+    ctl = `<select class="input" id="${id}" data-in="${k}" ${ro ? 'disabled' : ''}><option value="">Choose…</option>${opts.map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  } else if (f.type === 'textarea'){
+    ctl = `<textarea class="input" id="${id}" data-in="${k}" placeholder="${esc(f.ph || '')}" ${ro ? 'readonly' : ''}>${esc(v)}</textarea>`;
+  } else {
+    ctl = `<input class="input" id="${id}" data-in="${k}" value="${esc(v)}" placeholder="${esc(f.ph || '')}" autocomplete="off" ${ro ? 'readonly' : ''}>`;
+  }
+  return `<div class="field${f.full ? ' full' : ''}"><label for="${id}" class="lbl">${esc(f.label)}</label>${ctl}${f.helper ? '<span class="hint">Used for the decision only. Not saved to the sheet.</span>' : ''}</div>`;
+}
+
+function suggestionHTML(compact){
+  const s = suggest(S.draft, S.rec);
+  const chosen = S.draft.status;
+  const mismatch = s.status && chosen && chosen !== s.status;
+  return `<div class="suggest ${s.tone}">
+    <span class="eyebrow">Suggested by the Decision Matrix</span>
+    <span class="s-status">${s.status ? esc(s.status) : 'Not enough answers yet'}</span>
+    <span style="font-size:.9rem">${esc(s.rule)}</span>
+    ${s.status && !readOnly() && chosen !== s.status ? `<div><button class="btn sm primary" data-act="accept">Use this status</button></div>` : ''}
+    ${mismatch ? `<span style="font-size:.85rem" class="muted">You chose <b>${esc(chosen)}</b>. Add a comment explaining why it differs.</span>` : ''}
+    ${compact ? '' : '<button class="chip" data-kb="decision-matrix" style="align-self:flex-start">Open the Decision Matrix</button>'}
+  </div>`;
+}
+
+function noteHTML(){
+  return `<div class="field full"><span class="lbl">Verification note for TEBRA</span><div class="note-box" id="notebox">${esc(noteText(S.draft, S.rec))}</div>
+    <div class="row"><button class="btn sm" data-act="copy-note">${ic('copy')} Copy note</button><span class="hint">Paste into the patient's notes in TEBRA, then mark "note added" as Yes.</span></div></div>`;
+}
+
+function renderWork(){
+  const r = S.rec, ro = readOnly();
+  const returned = /^fail/i.test(r.qa) && r.work !== 'Completed';
+  const head = `
+    <div class="page-head"><div><button class="btn ghost" data-act="back">${ic('back')} ${role() === 'Intern' ? 'My Queue' : 'Back'}</button><h1 style="margin-top:6px">${esc(r.patient)}</h1>
+      <p>${pill(r.work, workTone(r.work))} &nbsp;<span class="mono">${esc(r.id)}</span> · assigned ${fmtDay(r.assignedOn)}${r.internName ? ' to ' + esc(r.internName) : ''}</p></div>
+      <div class="head-actions">${ro ? '<span class="pill plain">Read only</span>' : `<button class="btn" data-act="toggle-guided">${S.guided ? 'Skip all prompts (Express)' : 'Turn prompts back on (Guided)'}</button>`}</div></div>
+    <div class="pt-card">
+      <div><div class="eyebrow">Patient</div><div class="val big">${esc(r.patient)}</div></div>
+      <div><div class="eyebrow">Date of birth</div><div class="val mono">${esc(r.dob)}</div></div>
+      <div><div class="eyebrow">Provider</div><div class="val">${esc(r.provider)}</div></div>
+      <div><div class="eyebrow">Type of service</div><div class="val">${esc(r.tos)}</div></div>
+    </div>
+    ${returned ? `<div class="qa-flag"><b>Returned by QA:</b> ${esc(r.qaComment || 'No comment given')}. Fix the item, then submit again.</div>` : ''}`;
+  const body = S.guided && !ro ? guidedHTML() : expressHTML();
+  setMain(shellTop('Verify') + head + `<div class="ws"><div style="min-width:0">${body}</div>${asideHTML()}</div>`);
+}
+
+function guidedHTML(){
+  const st = STEPS[S.step], k = st.key;
+  const ticks = S.checks[k] || [];
+  const stepDone = i => { const s = STEPS[i]; return s.fields.every(f => { const def = F[f]; return (def.show && !def.show(S.draft, S.rec)) || S.draft[f]; }); };
+  const tipsHidden = S.hideTips[k];
+  const shortcut = k === 'find' && (S.draft.deceased === 'Yes' || S.draft.tebraActive === 'No');
+  return `
+    <div class="stepper" role="tablist" aria-label="Verification steps">${STEPS.map((s, i) => `<button role="tab" aria-selected="${i === S.step}" class="${i === S.step ? 'on' : ''} ${i !== S.step && stepDone(i) ? 'done' : ''}" data-step="${i}"><span class="dot">${i !== S.step && stepDone(i) ? '✓' : i + 1}</span>${s.short}</button>`).join('')}</div>
+    <div class="card step-card">
+      <div class="step-top"><div><div class="eyebrow">Step ${S.step + 1} of ${STEPS.length}</div><h2 style="margin-top:6px">${st.title}</h2></div></div>
+      <p class="step-goal">${st.goal}</p>
+      ${tipsHidden ? `<div class="guide-collapsed"><span>Prompts hidden for this step.</span><button class="btn sm ghost" data-tips="${k}">Show prompts</button></div>` : `
+      <div class="guide"><div class="guide-head"><b>${ic('bulb', 'ic')} How to do it</b><button class="btn sm ghost" data-tips="${k}">Skip prompts for this step</button></div>
+        <ol>${st.how.map(h => `<li>${esc(h)}</li>`).join('')}</ol>
+        <p class="why"><b>Why it matters:</b> ${esc(st.why)}</p>
+        <div class="kb-links">${st.kb.map(id => { const a = KB.find(x => x.id === id); return a ? `<button class="chip" data-kb="${id}">${esc(a.title)}</button>` : ''; }).join('')}</div>
+      </div>`}
+      <div class="checklist"><div class="eyebrow">Skill checklist · ${ticks.length}/${st.checks.length}</div>
+        ${st.checks.map((c, i) => `<label class="check ${ticks.includes(i) ? 'done' : ''}"><input type="checkbox" data-check="${k}" data-i="${i}" ${ticks.includes(i) ? 'checked' : ''}><span>${esc(c)}</span></label>`).join('')}
+      </div>
+      <div class="fields">${st.fields.map(fieldHTML).join('')}
+        ${k === 'decide' ? `<div class="full">${suggestionHTML()}</div>` : ''}
+        ${k === 'doc' ? noteHTML() : ''}
+      </div>
+      ${shortcut ? `<div class="suggest bad" style="margin-top:18px"><span class="s-status">${S.draft.deceased === 'Yes' ? 'Deceased' : 'TEBRA INACTIVE'}</span><span>No need to check insurance. Go straight to the decision.</span><div><button class="btn sm primary" data-step="6">Jump to the decision</button></div></div>` : ''}
+      <div class="step-nav">
+        <button class="btn" data-act="prev" ${S.step === 0 ? 'disabled' : ''}>← Back</button>
+        <div class="row">${escalateHTML()}
+        ${S.step < STEPS.length - 1 ? `<button class="btn primary" data-act="next">Save & continue →</button>` : `<button class="btn primary" data-act="submit">Submit verification</button>`}</div>
+      </div>
+    </div>`;
+}
+
+function escalateHTML(){
+  if (readOnly()) return '';
+  if (S.pendingEscalate) return `<span class="inline-confirm">Escalate to your manager? Your comment is sent with it. <button class="btn sm danger" data-act="escalate-yes">Escalate</button><button class="btn sm" data-act="escalate-no">Cancel</button></span>`;
+  return `<button class="btn" data-act="escalate">Escalate</button>`;
+}
+
+function expressHTML(){
+  const ro = readOnly();
+  const group = (title, keys) => `<div class="card step-card" style="margin-bottom:16px"><h3 style="margin-bottom:16px">${title}</h3><div class="fields">${keys.map(fieldHTML).join('')}</div></div>`;
+  return `
+    ${group('Patient record', ['tebraActive','deceased'])}
+    ${group('Insurance & eligibility', ['plan','memberId','dos','source','reference','eligibility'])}
+    ${group('Network, hospice & service', ['contracted','groupBilling','hospice','freqMet','tcmCovered','selfPay'])}
+    <div class="card step-card" style="margin-bottom:16px"><h3 style="margin-bottom:16px">Decision & documentation</h3>
+      <div class="fields"><div class="full">${suggestionHTML(true)}</div>${['status','caseName','notes','comment'].map(fieldHTML).join('')}${noteHTML()}</div>
+      ${ro ? '' : `<div class="step-nav"><button class="btn" data-act="save">Save draft</button><div class="row">${escalateHTML()}<button class="btn primary" data-act="submit">Submit verification</button></div></div>`}
+    </div>`;
+}
+
+function asideHTML(){
+  const r = S.rec;
+  const total = STEPS.reduce((a, s) => a + s.checks.length, 0);
+  const ticked = STEPS.reduce((a, s) => a + (S.checks[s.key] || []).length, 0);
+  return `<aside class="aside-stack">
+    ${S.guided && !readOnly() && STEPS[S.step].key === 'decide' ? '' : `<div class="card"><div class="eyebrow" style="margin-bottom:12px">Live decision</div>${suggestionHTML(true)}</div>`}
+    <div class="card"><div class="eyebrow" style="margin-bottom:12px">Account</div>
+      <dl class="kv"><dt>Record</dt><dd class="mono">${esc(r.id)}</dd><dt>Assigned</dt><dd>${fmtDay(r.assignedOn)}</dd><dt>Intern</dt><dd>${esc(r.internName || '—')}</dd>
+      <dt>Started</dt><dd>${esc(r.startedAt || '—')}</dd><dt>Completed</dt><dd>${esc(r.completedAt || '—')}</dd><dt>QA</dt><dd>${esc(r.qa || '—')}</dd>
+      ${S.guided ? `<dt>Skill checks</dt><dd class="tnum">${ticked}/${total}</dd>` : ''}</dl></div>
+    <div class="card"><div class="eyebrow" style="margin-bottom:10px">Quick reference</div><div class="intern-chips">
+      ${['decision-matrix','statuses','payer-call','hospice','note-format'].map(id => `<button class="chip" data-kb="${id}">${esc(KB.find(a => a.id === id).title.split('(')[0].trim())}</button>`).join('')}</div></div>
+  </aside>`;
+}
+
+function sheetPatch(){ const p = {}; SHEET_FIELDS.forEach(k => p[k] = S.draft[k] || ''); return p; }
+async function saveDraft(quiet){
+  if (readOnly()) return;
+  persistLocal();
+  try { S.rec = await call('save', {id:S.rec.id, fields:sheetPatch()}); if (!quiet) toast('Saved to the sheet'); }
+  catch(e){ fail(e); }
+}
+async function submitRecord(){
+  const d = S.draft, miss = [];
+  const short = d.tebraActive === 'No' || d.deceased === 'Yes';
+  if (!d.plan && !short) miss.push('Insurance plan');
+  if (!d.eligibility && !short) miss.push('Policy active');
+  if (!d.status) miss.push('Approval status');
+  if (!d.caseName) miss.push('Case name updated');
+  if (!d.notes) miss.push('Note added');
+  if (d.source && d.source !== 'TEBRA' && d.source !== 'Clearinghouse' && !d.reference) miss.push('Reference #');
+  if (miss.length){ toast('Fill in before submitting: ' + miss.join(', '), true); return; }
+  if (d.caseName === 'No' || d.notes === 'No'){ toast('Update the case name and note in TEBRA first, then mark them Yes. QA fails accounts without them.', true); return; }
+  const fields = sheetPatch(); fields.mode = S.guided ? 'Guided' : 'Express';
+  if (short){ fields.plan = fields.plan || 'N/A'; fields.eligibility = fields.eligibility || 'N/A'; }
+  try {
+    await call('save', {id:S.rec.id, fields, complete:true});
+    persistLocal();
+    const q = await call('queue', {date:S.date, includeOpen:true}); S.queue = q;
+    const next = q.find(x => /^fail/i.test(x.qa) && x.work !== 'Completed') || q.find(x => x.work === 'In Progress') || q.find(x => x.work === 'Assigned');
+    if (next && role() === 'Intern'){ toast('Submitted. Opening your next account.'); go('work', {id:next.id}); }
+    else { toast('Submitted. Your queue is clear.'); go(role() === 'Intern' ? 'queue' : 'board'); }
+  } catch(e){ fail(e); }
+}
+async function escalateRecord(){
+  if (!S.draft.comment){ S.pendingEscalate = false; toast('Add a comment saying what you checked and what is unclear, then escalate.', true); if (S.guided){ S.step = STEPS.length - 1; } renderWork(); setTimeout(() => { const c = $('#f_comment'); if (c) c.focus(); }, 30); return; }
+  const fields = sheetPatch(); if (!fields.status) fields.status = 'ON HOLD';
+  try { await call('save', {id:S.rec.id, fields, escalate:true}); toast('Escalated to your manager'); go(role() === 'Intern' ? 'queue' : 'board'); } catch(e){ fail(e); }
+}
+
+/* ---------------- manager: board ---------------- */
+async function viewBoard(){
+  loading('Team Board');
+  const sm = await call('summary', {date:S.date});
+  S.board = sm;
+  const qa = await call('queue', {needsQA:true}); S.qaCount = qa.length;
+  const rows = sm.rows.filter(r => !S.boardIntern || r.internEmail === S.boardIntern);
+  const done = sm.rows.filter(r => r.work === 'Completed').length;
+  const interns = S.boot.roster.filter(x => x.role === 'Intern');
+  const sc = Object.entries(sm.statusCounts).sort((a, b) => b[1] - a[1]);
+  setMain(shellTop('Team Board') + `
+    <div class="page-head"><div><h1>Team Board</h1><p>${fmtDay(sm.date)} · ${sm.rows.length} accounts incl. carried-over work</p></div>
+      <div class="head-actions"><input type="date" id="bdate" class="input" value="${S.date}" aria-label="Board date" style="width:auto"><button class="btn primary" data-nav="upload">+ Upload & assign</button></div></div>
+    <div class="tiles">
+      ${tile('Completed today', done, `of ${sm.rows.length} assigned · ${sm.rows.length ? Math.round(done / sm.rows.length * 100) : 0}%`, true)}
+      ${tile('Not started', sm.rows.filter(r => r.work === 'Assigned').length)}${tile('In progress', sm.rows.filter(r => r.work === 'In Progress').length)}${tile('Escalated', sm.rows.filter(r => r.work === 'Escalated').length, 'Need your decision')}${tile('Awaiting QA', qa.length)}
+    </div>
+    <div class="grid-2" style="margin-bottom:20px">
+      <div class="card"><div class="card-head"><h2>Intern progress</h2><span class="muted" style="font-size:.85rem">completed / assigned</span></div>
+        ${bars(sm.interns.filter(x => x.assigned).map(x => [x.name, x.completed, x.completed + ' / ' + x.assigned]).concat(sm.interns.filter(x => !x.assigned).map(x => [x.name, 0, '0 / 0'])), 'No interns on the roster yet.')}</div>
+      <div class="card"><div class="card-head"><h2>Outcomes at a glance</h2></div>${bars(sc, 'No approval statuses recorded yet for this date.')}</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Accounts</h2><div class="row">
+        <select class="input" id="bfilter" style="width:auto" aria-label="Filter by intern"><option value="">All interns</option>${interns.map(x => `<option value="${esc(x.email)}" ${S.boardIntern === x.email ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+        ${S.boardSel.size ? `<span class="muted">${S.boardSel.size} selected →</span><select class="input" id="reassignTo" style="width:auto" aria-label="Reassign to"><option value="">Reassign to…</option>${interns.map(x => `<option value="${esc(x.email)}">${esc(x.name)}</option>`).join('')}</select><button class="btn sm primary" data-act="reassign">Reassign</button>` : ''}
+      </div></div>
+      <div class="spacer"></div>
+      ${rows.length ? `<div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="selAll" aria-label="Select all"></th><th>Patient</th><th>Intern</th><th>Service</th><th>Work</th><th>Approval status</th><th>QA</th></tr></thead><tbody>
+      ${rows.map(r => `<tr class="click" data-open="${r.id}"><td data-stop><input type="checkbox" data-sel="${r.id}" ${S.boardSel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.patient)}"></td><td><div class="pname">${esc(r.patient)}</div><div class="psub mono">DOB ${esc(r.dob)}</div></td><td>${esc(r.internName || r.internEmail || 'Unassigned')}</td><td>${esc(r.tos)}</td><td>${pill(r.work, workTone(r.work))}</td><td>${pill(r.status, statusTone(r.status), true)}</td><td>${r.qa ? pill(r.qa, /^pass/i.test(r.qa) ? 'good' : 'bad') : '<span class="muted">—</span>'}</td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty"><h3>No accounts for this date</h3><p>Upload today's list to assign accounts to your interns.</p><div class="spacer"></div><button class="btn primary" data-nav="upload">Upload & assign</button></div>`}
+    </div>`);
+}
+
+/* ---------------- manager: upload & assign ---------------- */
+const HEAD_MAP = [['provider', /provider/], ['patient', /patient/], ['dob', /^dob$|birth/], ['tos', /type.*service|service.*type|^tos$|^service$/], ['dos', /^dos$|date.*of.*service/]];
+function parseGrid(grid){
+  grid = grid.filter(r => r && r.some(c => String(c).trim()));
+  const hi = grid.findIndex(r => r.some(c => /patient/i.test(String(c))));
+  if (hi === -1) throw new Error('Could not find a header row with "Patient Name". Include the header row: Provider Name, Patient Name, DOB, Type of Service.');
+  const heads = grid[hi].map(h => String(h).toLowerCase().replace(/[^a-z ]/g, '').trim());
+  const idx = {};
+  HEAD_MAP.forEach(([k, re]) => { const i = heads.findIndex(h => re.test(h)); if (i > -1) idx[k] = i; });
+  ['provider','patient','dob','tos'].forEach(k => { if (idx[k] == null) throw new Error('Missing column: ' + {provider:'Provider Name', patient:'Patient Name', dob:'DOB', tos:'Type of Service'}[k]); });
+  return grid.slice(hi + 1).map(r => ({
+    provider:String(r[idx.provider] || '').trim(), patient:String(r[idx.patient] || '').trim(),
+    dob:fmtDob(r[idx.dob]), tos:String(r[idx.tos] || '').trim(), dos:idx.dos != null ? fmtDob(r[idx.dos]) : '', internEmail:''
+  })).filter(r => r.patient);
+}
+function fmtDob(v){
+  if (v instanceof Date && !isNaN(v)) return (v.getMonth() + 1 + '').padStart(2, '0') + '/' + (v.getDate() + '').padStart(2, '0') + '/' + v.getFullYear();
+  if (typeof v === 'number' && v > 1000 && v < 80000){ const d = new Date(Math.round((v - 25569) * 86400000)); return (d.getUTCMonth() + 1 + '').padStart(2, '0') + '/' + (d.getUTCDate() + '').padStart(2, '0') + '/' + d.getUTCFullYear(); }
+  return String(v == null ? '' : v).trim();
+}
+function viewUpload(){
+  const U = S.up, interns = S.boot.roster.filter(x => x.role === 'Intern');
+  const assigned = U.rows.filter(r => r.internEmail).length;
+  const counts = {}; U.rows.forEach(r => { if (r.internEmail) counts[r.internEmail] = (counts[r.internEmail] || 0) + 1; });
+  setMain(shellTop('Upload & Assign') + `
+    <div class="page-head"><div><h1>Upload & assign</h1><p>Add today's accounts and split them between interns. They land in the Google Sheet and in each intern's queue.</p></div></div>
+    ${U.rows.length ? '' : `
+    <div class="grid-2">
+      <label class="drop" id="drop" for="file">${ic('file')}<h3>Drop the Excel or CSV file here</h3><p class="muted">or click to choose. Needs the columns Provider Name, Patient Name, DOB, Type of Service (DOS optional).</p><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></label>
+      <div class="card card-pad"><h3>Or paste from Google Sheets</h3><p class="muted" style="margin:4px 0 12px;font-size:.9rem">Copy the rows including the header row, then paste here.</p>
+        <textarea class="input" id="paste" placeholder="Provider Name&#9;Patient Name&#9;DOB&#9;Type of Service" style="min-height:120px"></textarea><div class="spacer"></div><button class="btn" data-act="parse-paste">Read pasted rows</button></div>
+    </div>
+    <div class="spacer"></div><p class="muted" style="font-size:.88rem">You can also type rows straight into the <b>Pt Verif</b> tab with an <b>INTERN NAME</b> from the Roster. The tool picks them up automatically the next time anyone opens it.</p>`}
+    ${U.rows.length ? `
+    <div class="card">
+      <div class="assign-bar">
+        <div class="field"><label for="update" class="lbl">Assignment date</label><input type="date" id="update" class="input" value="${U.date}"></div>
+        <div class="field" style="flex:1;min-width:240px"><span class="lbl">Distribute between</span><div class="intern-chips">${interns.map(x => `<button class="chip ${U.pick.has(x.email) ? 'on' : ''}" data-pick="${esc(x.email)}">${esc(x.name)}${counts[x.email] ? ' · ' + counts[x.email] : ''}</button>`).join('') || '<span class="muted">Add interns to the Roster tab first.</span>'}</div></div>
+        <div class="row"><button class="btn" data-act="distribute" ${U.pick.size ? '' : 'disabled'}>Split evenly</button><button class="btn ghost" data-act="clear-up">Start over</button></div>
+      </div>
+      <div class="card-head" style="padding-top:16px"><h2>${U.rows.length} accounts${U.fileName ? ` <span class="muted" style="font-weight:500;font-size:.9rem">from ${esc(U.fileName)}</span>` : ''}</h2><span class="muted">${assigned} of ${U.rows.length} assigned</span></div>
+      <div class="spacer"></div>
+      <div class="table-wrap"><table><thead><tr><th>Patient</th><th>DOB</th><th>Provider</th><th>Type of service</th><th>Assign to</th></tr></thead><tbody>
+      ${U.rows.map((r, i) => `<tr class="${!r.dob ? 'row-bad' : ''}"><td class="pname">${esc(r.patient)}</td><td class="mono">${esc(r.dob) || '<b>Missing</b>'}</td><td>${esc(r.provider)}</td><td>${esc(r.tos)}</td><td><select class="input" data-assign="${i}" style="min-width:150px" aria-label="Assign ${esc(r.patient)}"><option value="">Unassigned</option>${interns.map(x => `<option value="${esc(x.email)}" ${r.internEmail === x.email ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="step-nav" style="padding:0 24px 22px;border:0"><span class="muted">${U.rows.length - assigned ? `${U.rows.length - assigned} still unassigned` : 'Every account has an intern'}</span>
+        <button class="btn primary" data-act="do-upload" ${assigned === U.rows.length ? '' : 'disabled'}>Add ${U.rows.length} accounts to the sheet</button></div>
+    </div>` : ''}`);
+  const drop = $('#drop');
+  if (drop){
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) readFile(f); });
+    $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) readFile(f); });
+  }
+}
+function readFile(f){
+  if (!window.XLSX){ toast('The spreadsheet reader did not load. Paste the rows instead.', true); return; }
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const wb = XLSX.read(new Uint8Array(fr.result), {type:'array', cellDates:true});
+      const name = wb.SheetNames.find(n => /verif/i.test(n)) || wb.SheetNames[0];
+      const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:true, defval:''});
+      const rows = parseGrid(grid);
+      if (!rows.length) throw new Error('No patient rows found under the header.');
+      S.up.rows = rows; S.up.fileName = f.name; viewUpload(); toast(rows.length + ' accounts read from ' + name);
+    } catch(e){ fail(e); }
+  };
+  fr.readAsArrayBuffer(f);
+}
+
+/* ---------------- QA ---------------- */
+const QA_REASONS = ['Notes not updated (VAC)','Pt hospice alert not updated','Case name not updated','Wrong approval status','Wrong insurance plan','Network status incorrect','Missing reference #'];
+async function viewQA(){
+  loading('QA Review');
+  S.qaList = await call('queue', {needsQA:true}); S.qaCount = S.qaList.length;
+  if (!S.qaList.find(r => r.id === S.qaSel)) S.qaSel = S.qaList[0] ? S.qaList[0].id : null;
+  renderQA();
+}
+function renderQA(){
+  const r = S.qaList.find(x => x.id === S.qaSel);
+  setMain(shellTop('QA Review') + `
+    <div class="page-head"><div><h1>QA Review</h1><p>${S.qaList.length} completed account${S.qaList.length === 1 ? '' : 's'} waiting for review. Failed accounts go back to the intern's queue.</p></div></div>
+    ${S.qaList.length ? `<div class="ws">
+      <div class="card" style="min-width:0"><div class="table-wrap"><table><thead><tr><th>Patient</th><th>Intern</th><th>Status</th><th>Mode</th></tr></thead><tbody>
+        ${S.qaList.map(x => `<tr class="click" data-qa="${x.id}" style="${x.id === S.qaSel ? 'background:var(--accent-soft)' : ''}"><td><div class="pname">${esc(x.patient)}</div><div class="psub">${esc(x.tos)} · completed ${esc(x.completedAt)}</div></td><td>${esc(x.internName)}</td><td>${pill(x.status, statusTone(x.status), true)}</td><td>${pill(x.mode || '—', x.mode === 'Guided' ? 'accent' : '', true)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+      ${r ? `<aside class="aside-stack"><div class="card">
+        <div class="eyebrow">Reviewing</div><h3 style="margin:6px 0 2px">${esc(r.patient)}</h3><p class="muted mono" style="margin-bottom:14px">DOB ${esc(r.dob)} · ${esc(r.id)}</p>
+        <dl class="kv">${[['Provider',r.provider],['Service',r.tos],['DOS',r.dos],['Plan',r.plan],['Member ID',r.memberId],['Verified via',r.source],['Reference',r.reference],['Eligible',r.eligibility],['Contracted',r.contracted],['Hospice',r.hospice],['Case name updated',r.caseName],['Notes updated',r.notes],['Approval status',r.status]].map(([a, b]) => `<dt>${a}</dt><dd>${esc(b || '—')}</dd>`).join('')}</dl>
+        ${r.comment ? `<p style="margin-top:12px;font-size:.9rem"><b>Comment:</b> ${esc(r.comment)}</p>` : ''}
+      </div>
+      <div class="card"><div class="eyebrow" style="margin-bottom:10px">Finding (for a fail)</div>
+        <div class="intern-chips">${QA_REASONS.map(q => `<button class="chip ${S.qaReason === q ? 'on' : ''}" data-reason="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+        <div class="spacer"></div><textarea class="input" id="qacomment" placeholder="QA comment">${esc(S.qaReason)}</textarea>
+        <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn danger" data-act="qa-fail">Fail & return</button><button class="btn primary" data-act="qa-pass">Pass</button></div>
+      </div></aside>` : ''}
+    </div>` : `<div class="card"><div class="empty"><h3>All caught up</h3><p>No completed accounts are waiting for QA.</p></div></div>`}`);
+}
+
+/* ---------------- progress ---------------- */
+const COMPETENCIES = [
+  ['I can explain eligibility vs. benefits verification','what-is-ibv'],
+  ['I can read effective and termination dates on a 271 response','eligibility-271'],
+  ['I know when to use TEBRA, a payer portal, or a call','sources'],
+  ['I can tell HMO, PPO, Medicare Advantage, and Medigap apart','plan-types'],
+  ['I can work out primary vs. secondary coverage','cob'],
+  ['I can check network status for a specific plan','network'],
+  ['I can find a hospice election and know what to update','hospice'],
+  ['I know the AWV and TCM frequency rules','svc-awv'],
+  ['I can apply the Decision Matrix without the suggestion','decision-matrix'],
+  ['I document case name, note, and alerts every time','note-format']
+];
+async function viewProgress(){
+  loading('Progress');
+  const interns = S.boot.roster.filter(x => x.role === 'Intern');
+  if (role() !== 'Intern' && !S.progEmail && interns[0]) S.progEmail = interns[0].email;
+  const st = await call('stats', role() === 'Intern' ? {} : {email:S.progEmail}); S.stats = st;
+  const pickIntern = role() === 'Intern' ? '' : `<select class="input" id="progEmail" style="width:auto" aria-label="Intern">${interns.map(x => `<option value="${esc(x.email)}" ${S.progEmail === x.email ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`;
+  const comp = store.get('competencies', []);
+  const rate = st.qaReviewed ? Math.round(st.qaPassed / st.qaReviewed * 100) : null;
+  const ms = [
+    ['Complete 10 verifications in Guided mode', Math.min(st.guided, 10), 10],
+    ['Get 20 accounts reviewed by QA', Math.min(st.qaReviewed, 20), 20],
+    ['Reach a 90% QA pass rate', rate == null ? 0 : Math.min(rate, 90), 90, rate == null ? '—' : rate + '%'],
+    ['Tick all 10 competencies below', comp.length, 10]
+  ];
+  const ready = st.guided >= 10 && rate != null && rate >= 90;
+  setMain(shellTop('Progress') + `
+    <div class="page-head"><div><h1>${role() === 'Intern' ? 'My progress' : 'Skills & progress'}</h1><p>${role() === 'Intern' ? 'Your verification record and the skills that get you to working independently.' : 'Each intern\'s record and readiness to work without prompts.'}</p></div><div class="head-actions">${pickIntern}</div></div>
+    <div class="tiles">
+      ${tile('Verifications completed', st.completed, st.guided + ' guided · ' + st.express + ' express', true)}
+      ${tile('QA reviewed', st.qaReviewed)}${tile('QA passed', st.qaPassed)}${tile('Pass rate', rate == null ? '—' : rate + '%')}${tile('Competencies', comp.length + '/10')}
+    </div>
+    <div class="grid-2">
+      <div class="card card-pad"><h2 style="margin-bottom:6px">Path to Express mode</h2><p class="muted" style="margin-bottom:18px;font-size:.92rem">${ready ? 'You meet the bar for working without prompts. Switch to Express mode in the sidebar any time.' : 'Express mode is always available, but these milestones show you are ready to work without prompts.'}</p>
+        <div class="milestones">${ms.map(([l, v, max, lab]) => `<div class="ms ${v >= max ? 'done' : ''}"><span class="ico">${v >= max ? '✓' : ''}</span><div><div style="font-weight:600;font-size:.94rem">${l}</div><div class="track"><i style="width:${Math.min(100, v / max * 100)}%"></i></div></div><span class="tnum muted">${lab || v + '/' + max}</span></div>`).join('')}</div>
+      </div>
+      <div class="card card-pad"><h2 style="margin-bottom:6px">Your top QA findings</h2><p class="muted" style="margin-bottom:14px;font-size:.92rem">Focus here first. Each links to the article that helps.</p>
+        ${st.topFails.length ? `<div class="kb-list">${st.topFails.map(f => { const id = /hospice/i.test(f.reason) ? 'hospice' : /note|vac|case/i.test(f.reason) ? 'note-format' : /status/i.test(f.reason) ? 'decision-matrix' : /network|inn|credential/i.test(f.reason) ? 'network' : 'qa'; return `<button class="kb-item" data-kb="${id}"><b>${esc(f.reason)}</b><span>${f.count} time${f.count === 1 ? '' : 's'} · open guide →</span></button>`; }).join('')}</div>` : '<div class="empty" style="padding:24px">No QA fails yet. Keep it that way.</div>'}
+      </div>
+    </div>
+    <div class="spacer"></div>
+    ${role() !== 'Intern' ? '' : `<div class="card card-pad"><h2 style="margin-bottom:6px">Competency checklist</h2><p class="muted" style="margin-bottom:12px;font-size:.92rem">Tick a skill when you can do it without looking it up. Saved on this device.</p>
+      <div class="checklist" style="margin:0">${COMPETENCIES.map(([c, id], i) => `<div class="row" style="justify-content:space-between;gap:6px"><label class="check ${comp.includes(i) ? 'done' : ''}" style="flex:1"><input type="checkbox" data-comp="${i}" ${comp.includes(i) ? 'checked' : ''}><span>${esc(c)}</span></label><button class="chip" data-kb="${id}">Study</button></div>`).join('')}</div>
+    </div>`}`);
+}
+
+/* ---------------- knowledge base drawer ---------------- */
+function openKB(id){ S.kb.open = true; if (id) S.kb.id = id; renderKB(); renderSide(); setTimeout(() => { const i = $('#kbq'); if (i && !id) i.focus(); }, 260); }
+function closeKB(){ S.kb.open = false; renderKB(); renderSide(); }
+function renderKB(){
+  const K = S.kb, el = $('#kb');
+  el.classList.toggle('on', K.open);
+  el.setAttribute('aria-hidden', K.open ? 'false' : 'true');
+  if (!K.open) return;
+  const q = K.q.trim().toLowerCase();
+  const list = KB.filter(a => (K.cat === 'All' || a.cat === K.cat) && (!q || (a.title + ' ' + a.summary + ' ' + a.tags + ' ' + a.body.replace(/<[^>]+>/g, ' ')).toLowerCase().includes(q)));
+  const art = K.id ? KB.find(a => a.id === K.id) : null;
+  const headExists = $('#kbq');
+  if (!headExists){
+    el.innerHTML = `<div class="kb-head"><div class="kb-head-top"><h2>Knowledge Base</h2><button class="btn sm" data-act="kb-close" aria-label="Close knowledge base">${ic('x')}</button></div>
+      <div class="kb-search">${ic('search')}<input id="kbq" class="input" placeholder="Search terms, statuses, payers… (press / anywhere)" autocomplete="off"></div>
+      <div class="kb-cats" id="kbcats"></div></div><div class="kb-body" id="kbbody"></div>`;
+  }
+  $('#kbq').value = K.q;
+  $('#kbcats').innerHTML = ['All'].concat(KB_CATS).map(c => `<button class="chip ${K.cat === c ? 'on' : ''}" data-kbcat="${esc(c)}">${esc(c)}</button>`).join('');
+  $('#kbbody').innerHTML = art ? `<button class="btn ghost" data-act="kb-list" style="margin-bottom:10px">${ic('back')} All articles</button>
+      <article class="kb-article"><div class="eyebrow" style="margin-bottom:8px">${esc(art.cat)}</div><h2>${esc(art.title)}</h2><p class="muted" style="margin-bottom:14px">${esc(art.summary)}</p>${art.body}</article>`
+    : (list.length ? `<div class="kb-list">${list.map(a => `<button class="kb-item" data-kb="${a.id}"><b>${esc(a.title)}</b><span>${esc(a.cat)} · ${esc(a.summary)}</span></button>`).join('')}</div>`
+      : `<div class="empty"><h3>No articles match "${esc(K.q)}"</h3><p>Try a shorter term, or ask your manager to add an article.</p></div>`);
+  if (art) $('#kbbody').scrollTop = 0;
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-nav],[data-act],[data-open],[data-filter],[data-step],[data-set],[data-tips],[data-kb],[data-kbcat],[data-role],[data-pick],[data-qa],[data-reason]');
+  if (!t) return;
+  if (t.closest('[data-stop]') && !t.matches('[data-stop]')) return;
+  const ds = t.dataset;
+  if (ds.nav){ if (ds.nav === 'kb') openKB(); else go(ds.nav); return; }
+  if (ds.open){ if (e.target.closest('[data-stop]')) return; go('work', {id:ds.open}); return; }
+  if (ds.filter){ S.filter = ds.filter; viewQueue().catch(fail); return; }
+  if (ds.step != null){ if (!readOnly()) saveDraft(true); S.step = +ds.step; persistLocal(); renderWork(); window.scrollTo(0, 0); return; }
+  if (ds.set){ S.draft[ds.set] = S.draft[ds.set] === ds.val ? '' : ds.val; persistLocal(); renderWork(); return; }
+  if (ds.tips){ S.hideTips[ds.tips] = !S.hideTips[ds.tips]; store.set('hideTips', S.hideTips); renderWork(); return; }
+  if (ds.kb){ S.kb.id = ds.kb; openKB(ds.kb); return; }
+  if (ds.kbcat){ S.kb.cat = ds.kbcat; S.kb.id = null; renderKB(); return; }
+  if (ds.role){ Mock.setRole(ds.role); await boot(); return; }
+  if (ds.pick){ S.up.pick.has(ds.pick) ? S.up.pick.delete(ds.pick) : S.up.pick.add(ds.pick); viewUpload(); return; }
+  if (ds.qa){ S.qaSel = ds.qa; S.qaReason = ''; renderQA(); return; }
+  if (ds.reason){ S.qaReason = S.qaReason === ds.reason ? '' : ds.reason; renderQA(); return; }
+  switch (ds.act){
+    case 'toggle-guided': S.guided = !S.guided; store.set('guided', S.guided); renderSide(); if (S.view === 'work') renderWork(); toast(S.guided ? 'Guided mode on: step-by-step prompts' : 'Express mode: all prompts skipped'); break;
+    case 'menu': S.menu = !S.menu; renderSide(); break;
+    case 'kb': openKB(); break;
+    case 'kb-close': closeKB(); break;
+    case 'kb-list': S.kb.id = null; renderKB(); break;
+    case 'back': go(role() === 'Intern' ? 'queue' : (S.prevBoard || 'board')); break;
+    case 'prev': if (S.step > 0){ saveDraft(true); S.step--; persistLocal(); renderWork(); window.scrollTo(0, 0); } break;
+    case 'next': await saveDraft(true); S.step = Math.min(STEPS.length - 1, S.step + 1); persistLocal(); renderWork(); window.scrollTo(0, 0); break;
+    case 'save': await saveDraft(false); renderWork(); break;
+    case 'submit': await submitRecord(); break;
+    case 'escalate': S.pendingEscalate = true; renderWork(); break;
+    case 'escalate-no': S.pendingEscalate = false; renderWork(); break;
+    case 'escalate-yes': await escalateRecord(); break;
+    case 'accept': { const s = suggest(S.draft, S.rec); if (s.status){ S.draft.status = s.status; persistLocal(); renderWork(); toast('Status set to ' + s.status); } break; }
+    case 'copy-note': {
+      const txt = noteText(S.draft, S.rec);
+      try { await navigator.clipboard.writeText(txt); toast('Note copied. Paste it into TEBRA.'); }
+      catch(err){ const r = document.createRange(); r.selectNodeContents($('#notebox')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Note selected. Press Ctrl+C to copy.'); }
+      break; }
+    case 'parse-paste': {
+      const txt = $('#paste').value; if (!txt.trim()){ toast('Paste rows from your sheet first.', true); break; }
+      try { const rows = parseGrid(txt.split(/\r?\n/).map(l => l.split('\t'))); if (!rows.length) throw new Error('No patient rows found under the header.'); S.up.rows = rows; S.up.fileName = ''; viewUpload(); toast(rows.length + ' accounts read'); } catch(err){ fail(err); }
+      break; }
+    case 'distribute': { const ps = [...S.up.pick]; S.up.rows.forEach((r, i) => r.internEmail = ps[i % ps.length]); viewUpload(); toast('Split ' + S.up.rows.length + ' accounts between ' + ps.length + ' intern' + (ps.length > 1 ? 's' : '')); break; }
+    case 'clear-up': S.up = {rows:[], date:localToday(), pick:new Set(), fileName:''}; viewUpload(); break;
+    case 'do-upload': {
+      t.disabled = true;
+      try { const res = await call('upload', {date:S.up.date, rows:S.up.rows}); toast(res.added + ' accounts added for ' + fmtDay(res.date)); S.date = res.date; S.up = {rows:[], date:localToday(), pick:new Set(), fileName:''}; go('board'); }
+      catch(err){ t.disabled = false; fail(err); }
+      break; }
+    case 'reassign': {
+      const to = $('#reassignTo').value; if (!to){ toast('Choose an intern to reassign to.', true); break; }
+      try { await call('reassign', {ids:[...S.boardSel], email:to}); toast('Reassigned ' + S.boardSel.size + ' account(s)'); S.boardSel.clear(); viewBoard(); } catch(err){ fail(err); }
+      break; }
+    case 'qa-pass': case 'qa-fail': {
+      const comment = $('#qacomment').value.trim();
+      if (ds.act === 'qa-fail' && !comment){ toast('Add a finding so the intern knows what to fix.', true); break; }
+      try { await call('qa', {id:S.qaSel, result:ds.act === 'qa-pass' ? 'PASSED' : 'FAILED', comment}); toast(ds.act === 'qa-pass' ? 'Passed' : 'Returned to intern'); S.qaReason = ''; S.qaSel = null; viewQA(); } catch(err){ fail(err); }
+      break; }
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.in){ S.draft[t.dataset.in] = t.value; persistLocal(); if (t.tagName === 'SELECT') renderWork(); return; }
+  if (t.dataset.check){ const k = t.dataset.check, i = +t.dataset.i, arr = S.checks[k] || []; S.checks[k] = t.checked ? [...new Set(arr.concat(i))] : arr.filter(x => x !== i); persistLocal(); renderWork(); return; }
+  if (t.dataset.comp != null){ let c = store.get('competencies', []); const i = +t.dataset.comp; c = t.checked ? [...new Set(c.concat(i))] : c.filter(x => x !== i); store.set('competencies', c); viewProgress(); return; }
+  if (t.dataset.sel){ t.checked ? S.boardSel.add(t.dataset.sel) : S.boardSel.delete(t.dataset.sel); viewBoardKeep(); return; }
+  if (t.id === 'selAll'){ const rows = S.board.rows.filter(r => !S.boardIntern || r.internEmail === S.boardIntern); rows.forEach(r => t.checked ? S.boardSel.add(r.id) : S.boardSel.delete(r.id)); viewBoardKeep(); return; }
+  if (t.dataset.assign != null){ S.up.rows[+t.dataset.assign].internEmail = t.value; viewUpload(); return; }
+  if (t.id === 'qdate'){ S.date = t.value || localToday(); viewQueue().catch(fail); return; }
+  if (t.id === 'bdate'){ S.date = t.value || localToday(); S.boardSel.clear(); viewBoard().catch(fail); return; }
+  if (t.id === 'bfilter'){ S.boardIntern = t.value; S.boardSel.clear(); viewBoard().catch(fail); return; }
+  if (t.id === 'progEmail'){ S.progEmail = t.value; viewProgress().catch(fail); return; }
+  if (t.id === 'update'){ S.up.date = t.value || localToday(); return; }
+});
+function viewBoardKeep(){ const y = window.scrollY; viewBoard().then(() => window.scrollTo(0, y)).catch(fail); }
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.in && t.tagName !== 'SELECT'){ S.draft[t.dataset.in] = t.value; persistLocal(); const nb = $('#notebox'); if (nb) nb.textContent = noteText(S.draft, S.rec); return; }
+  if (t.id === 'kbq'){ S.kb.q = t.value; S.kb.id = null; renderKB(); }
+});
+document.addEventListener('keydown', e => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (e.key === '/' && !typing){ e.preventDefault(); openKB(); }
+  if (e.key === 'Escape'){ if (S.kb.open) closeKB(); else if (S.menu){ S.menu = false; renderSide(); } }
+  if ((e.key === 'Enter' || e.key === ' ') && document.activeElement.dataset && document.activeElement.dataset.act === 'toggle-guided' && document.activeElement.classList.contains('mode-switch')){ e.preventDefault(); document.activeElement.click(); }
+});
+$('#scrim').addEventListener('click', () => { if (S.kb.open) closeKB(); S.menu = false; renderSide(); });
+
+/* ---------------- demo backend (used only outside Google Apps Script) ---------------- */
+const Mock = (function(){
+  const T = localToday();
+  const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
+  const roster = [
+    {name:'Jimmar S.', email:'manager@demo.example', role:'Manager', active:true},
+    {name:'Bea Navarro', email:'bea@demo.example', role:'Intern', active:true},
+    {name:'Carlo Dizon', email:'carlo@demo.example', role:'Intern', active:true},
+    {name:'Mika Santos', email:'mika@demo.example', role:'Intern', active:true}
+  ];
+  let roleNow = store.get('demoRole', 'Intern');
+  const me = () => roleNow === 'Manager' ? roster[0] : roster[1];
+  let n = 100;
+  const mk = (patient, dob, provider, tos, intern, extra) => Object.assign({id:'IV-DEMO' + (n++), patient, dob, provider, tos, internEmail:intern.email, internName:intern.name, assignedOn:T, work:'Assigned',
+    verifDate:'', status:'', dos:'', plan:'', contracted:'', eligibility:'', hospice:'', caseName:'', notes:'', comment:'', qa:'', qaComment:'', source:'', memberId:'', reference:'', mode:'', startedAt:'', completedAt:'', qaBy:''}, extra || {});
+  const [, B, C, M] = roster;
+  const done = (o) => Object.assign({work:'Completed', verifDate:T, startedAt:T + ' 08:40', completedAt:T + ' 09:05', caseName:'Yes', notes:'Yes', source:'TEBRA', eligibility:'Yes', contracted:'Yes', hospice:'No', status:'Good to Schedule', mode:'Guided', memberId:'DEMO000000'}, o);
+  let rows = [
+    mk('Harold Pruitt (sample)','03/14/1948','Dr. Elena Park, NP','Annual Wellness Visit',B),
+    mk('Lorraine Whitfield (sample)','11/02/1951','Dr. Elena Park, NP','TCM',B),
+    mk('Dennis Okafor (sample)','07/22/1945','Dr. Samuel Reyes, MD','CCM',B, {work:'In Progress', startedAt:T + ' 09:12', plan:'Humana Gold Plus HMO', memberId:'DEMO124578', source:'TEBRA', eligibility:'Yes'}),
+    mk('Gloria Benton (sample)','01/30/1957','Dr. Samuel Reyes, MD','Home Visit',B, {assignedOn:daysAgo(1), work:'In Progress', startedAt:daysAgo(1) + ' 15:40'}),
+    mk('Raymond Castillo (sample)','09/09/1943','Dr. Elena Park, NP','Annual Wellness Visit',B, done({plan:'Medicare Part B', qa:'FAILED', qaComment:'Notes not updated (VAC)', work:'In Progress', qaBy:'manager@demo.example'})),
+    mk('Evelyn Hart (sample)','05/18/1950','Dr. Samuel Reyes, MD','Annual Wellness Visit',B, done({plan:'Aetna Medicare PPO', qa:'PASSED'})),
+    mk('Walter Lindqvist (sample)','12/01/1939','Dr. Elena Park, NP','TCM',B, done({plan:'UHC AARP Medicare Advantage', hospice:'Yes', contracted:'No', status:'Ok for Group Billing', comment:'Hospice since 08/2026 per Medicare.'})),
+    mk('Patricia Moody (sample)','02/27/1955','Dr. Samuel Reyes, MD','Annual Wellness Visit',C, done({plan:'BCBS AZ PPO', mode:'Express'})),
+    mk('Franklin Ibarra (sample)','08/15/1947','Dr. Elena Park, NP','CCM',C, done({plan:'Medicare Part B', eligibility:'No', status:'Policy Not Active', contracted:'', hospice:''})),
+    mk('Irene Vasquez (sample)','04/04/1952','Dr. Samuel Reyes, MD','Home Visit',C, {work:'Escalated', status:'ON HOLD', comment:'TEBRA shows active, portal shows term 08/31. Payer call dropped after 25 min.'}),
+    mk('Clarence Boyd (sample)','10/10/1941','Dr. Elena Park, NP','Annual Wellness Visit',C),
+    mk('Margaret Ellison (sample)','06/06/1949','Dr. Samuel Reyes, MD','Annual Wellness Visit',M, done({plan:'Humana Choice PPO', status:'Frequency Requirement Not Met', comment:'Last AWV 02/2026.'})),
+    mk('Victor Nakamura (sample)','03/03/1946','Dr. Elena Park, NP','TCM',M, {work:'In Progress', startedAt:T + ' 09:30'}),
+    mk('Doris Kimball (sample)','12/24/1953','Dr. Samuel Reyes, MD','CCM',M),
+    // history for progress stats
+    mk('Sample history 1','01/01/1950','Dr. Elena Park, NP','Annual Wellness Visit',B, done({assignedOn:daysAgo(2), qa:'PASSED'})),
+    mk('Sample history 2','01/01/1950','Dr. Elena Park, NP','CCM',B, done({assignedOn:daysAgo(2), qa:'PASSED'})),
+    mk('Sample history 3','01/01/1950','Dr. Elena Park, NP','TCM',B, done({assignedOn:daysAgo(3), qa:'FAILED', qaComment:'Pt hospice alert not updated'})),
+    mk('Sample history 4','01/01/1950','Dr. Samuel Reyes, MD','Home Visit',B, done({assignedOn:daysAgo(3), qa:'PASSED', mode:'Express'}))
+  ];
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const find = id => rows.find(r => r.id === id);
+  const stamp = () => T + ' ' + new Date().toTimeString().slice(0, 5);
+  function handle(a, p){
+    const u = me();
+    if (a === 'bootstrap') return {me:u, roster, statuses:['Good to Schedule','Provider out of Network','Policy Not Active','Deceased','Approved for Self Pay','No self pay agreement','Ok for Group Billing','Frequency Requirement Not Met','TEBRA INACTIVE','ON HOLD','No TCM Coverage'], today:T};
+    if (a === 'queue') return rows.filter(r => {
+      if (u.role === 'Intern' && r.internEmail !== u.email) return false;
+      if (p.needsQA) return r.work === 'Completed' && !r.qa;
+      if (p.date && r.assignedOn !== p.date) return !!p.includeOpen && r.work !== 'Completed' && r.assignedOn < p.date;
+      return true; });
+    if (a === 'record') return find(p.id);
+    if (a === 'start'){ const r = find(p.id); if (r.work === 'Assigned'){ r.work = 'In Progress'; r.startedAt = stamp(); } return r; }
+    if (a === 'save'){ const r = find(p.id); Object.assign(r, p.fields || {});
+      if (p.complete){ r.work = 'Completed'; r.completedAt = stamp(); r.verifDate = T; r.internName = u.name; if (r.qa) r.qa = ''; }
+      else if (p.escalate) r.work = 'Escalated'; else if (r.work === 'Assigned') r.work = 'In Progress'; return r; }
+    if (a === 'upload'){ (p.rows || []).forEach(x => { const who = roster.find(y => y.email === x.internEmail) || {}; rows.push(mk(x.patient, x.dob, x.provider, x.tos, who, {assignedOn:p.date, dos:x.dos || ''})); }); return {added:(p.rows || []).length, date:p.date}; }
+    if (a === 'reassign'){ const who = roster.find(y => y.email === p.email); p.ids.forEach(id => { const r = find(id); r.internEmail = who.email; r.internName = who.name; }); return {moved:p.ids.length}; }
+    if (a === 'qa'){ const r = find(p.id); r.qa = p.result; r.qaComment = p.comment; r.qaBy = u.email; if (p.result === 'FAILED') r.work = 'In Progress'; return r; }
+    if (a === 'summary'){ const date = p.date || T; const rs = rows.filter(r => r.assignedOn === date || (r.work !== 'Completed' && r.assignedOn < date));
+      const by = {}; roster.filter(x => x.role === 'Intern').forEach(x => by[x.email] = {name:x.name, email:x.email, assigned:0, inProgress:0, completed:0, escalated:0});
+      const sc = {}; rs.forEach(r => { const b = by[r.internEmail]; if (b){ b.assigned++; if (r.work === 'Completed') b.completed++; if (r.work === 'In Progress') b.inProgress++; if (r.work === 'Escalated') b.escalated++; } if (r.status) sc[r.status] = (sc[r.status] || 0) + 1; });
+      return {date, interns:Object.values(by), statusCounts:sc, rows:rs}; }
+    if (a === 'stats'){ const mine = rows.filter(r => r.internEmail === (u.role === 'Intern' ? u.email : (p.email || B.email)));
+      const d = mine.filter(r => r.work === 'Completed' || /^fail/i.test(r.qa)); const q = d.filter(r => r.qa); const pass = q.filter(r => /^pass/i.test(r.qa));
+      const f = {}; q.filter(r => /^fail/i.test(r.qa)).forEach(r => f[r.qaComment] = (f[r.qaComment] || 0) + 1);
+      const g = d.filter(r => r.mode === 'Guided').length;
+      return {completed:d.length, guided:g, express:d.length - g, qaReviewed:q.length, qaPassed:pass.length, topFails:Object.entries(f).map(([reason, count]) => ({reason, count})).sort((x, y) => y.count - x.count)}; }
+    throw new Error('Unknown action ' + a);
+  }
+  return {
+    api(a, p){ return new Promise((res, rej) => setTimeout(() => { try { res(clone(handle(a, p))); } catch(e){ rej(e); } }, 120)); },
+    setRole(r){ roleNow = r; store.set('demoRole', r); }
+  };
+})();
+
+/* ---------------- boot ---------------- */
+async function boot(){
+  setMain('<div class="loading">Loading your workspace…</div>');
+  try {
+    S.boot = await call('bootstrap', {});
+    S.date = S.boot.today || localToday();
+    S.queue = []; S.boardSel.clear(); S.filter = 'all';
+    if (canQA()) call('queue', {needsQA:true}).then(q => { S.qaCount = q.length; renderSide(); }).catch(() => {});
+    go(role() === 'Intern' ? 'queue' : 'board');
+  } catch(e){
+    $('#side').innerHTML = '<div class="brand"><span class="brand-mark">Verify Desk</span><span class="brand-name">Eligibility<br>&amp; Benefits</span></div>';
+    setMain(`<div class="card card-pad" style="max-width:560px;margin-top:40px"><h2>You can't open the Verify Desk yet</h2><p class="muted" style="margin-top:8px">${esc(e.message || e)}</p></div>`);
+  }
+}
+boot();
+})();
+
+</script>
