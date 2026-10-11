@@ -283,12 +283,19 @@ tbody tr.click:hover td{background:var(--surface-2)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
+/* Time study heatmap: one hue (accent), light to dark by minutes */
+table.heat th.num,table.heat td.num{text-align:right}
+table.heat td.hm{text-align:right;font-variant-numeric:tabular-nums;background:color-mix(in srgb,var(--accent) var(--p),var(--surface));border-left:2px solid var(--surface);white-space:nowrap}
+table.heat td.hm.dark{color:#fff}
+.hm-flag{color:var(--orange);font-size:.8em}
+table.heat td.hm.dark .hm-flag{color:#ffd59e}
+table.heat tr.team-row td{background:var(--surface-2);border-top:2px solid var(--line-strong)}
+
 </style>
 <div class="app">
   <aside class="side" id="side" aria-label="Navigation"></aside>
   <main class="main" id="main"></main>
 </div>
-<button class="kb-fab" data-act="kb" aria-label="Open knowledge base"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 21.5V4.5M8 7h8M8 11h6"/></svg><span class="lbl">Knowledge base</span> <span class="kbd lbl">/</span></button>
 <div class="scrim" id="scrim"></div>
 <section class="kb" id="kb" aria-label="Knowledge base" aria-hidden="true"></section>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -461,13 +468,44 @@ const fmtDay = iso => { if(!iso) return ''; const d = new Date(iso + 'T00:00:00'
 const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0,2).map(x => x[0].toUpperCase()).join('');
 const IS_GAS = !!(window.google && google.script && google.script.run);
 
+let TOKEN = store.get('token', '');
 function call(action, payload){
   if (IS_GAS) return new Promise((res, rej) => google.script.run
     .withSuccessHandler(res)
-    .withFailureHandler(e => rej(e && e.message ? e : new Error(String(e))))
-    .api(action, payload || {}));
+    .withFailureHandler(e => {
+      const err = e && e.message ? e : new Error(String(e));
+      if (/AUTH:/.test(err.message) && action !== 'login'){ const had = !!TOKEN; TOKEN = ''; store.set('token', ''); showLogin(had ? 'Your session ended. Sign in again.' : ''); err.message = 'Please sign in again.'; }
+      err.message = err.message.replace(/^(Exception|Error):\s*/, '');
+      rej(err);
+    })
+    .api(action, payload || {}, TOKEN));
   return Mock.api(action, payload || {});
 }
+const BRAND = '<div class="brand"><span class="brand-mark">Verify Desk</span><span class="brand-name">Eligibility<br>&amp; Benefits</span></div>';
+function showLogin(msg){
+  S.boot = null;
+  $('#side').innerHTML = BRAND;
+  setMain(`<div class="card card-pad" style="max-width:440px;margin:48px auto 0">
+    <div class="eyebrow">Verify Desk</div><h2 style="margin:8px 0 6px">Sign in</h2>
+    <p class="muted" style="margin-bottom:20px;font-size:.92rem">Use the email your manager added to the Roster and the 6-digit PIN they gave you.</p>
+    ${msg ? `<div class="qa-flag" style="margin-bottom:16px">${esc(msg)}</div>` : ''}
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:14px" novalidate>
+      <div class="field"><label for="lgEmail">Email</label><input class="input" id="lgEmail" type="email" autocomplete="username" required value="${esc(store.get('lastEmail', ''))}"></div>
+      <div class="field"><label for="lgPin">PIN</label><input class="input" id="lgPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" required></div>
+      <button class="btn primary" type="submit" id="lgBtn" style="justify-content:center">Sign in</button>
+    </form>
+    <p class="muted" style="margin-top:16px;font-size:.82rem">Forgot your PIN? Ask your manager. They can see it in the Roster tab.</p></div>`);
+  setTimeout(() => { const f = $(store.get('lastEmail', '') ? '#lgPin' : '#lgEmail'); if (f) f.focus(); }, 30);
+}
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'loginForm') return;
+  e.preventDefault();
+  const email = $('#lgEmail').value.trim(), pin = $('#lgPin').value.trim();
+  if (!email || !pin){ toast('Enter your email and PIN.', true); return; }
+  const btn = $('#lgBtn'); btn.disabled = true; btn.textContent = 'Signing in…';
+  try { const r = await call('login', {email, pin}); TOKEN = r.token; store.set('token', TOKEN); store.set('lastEmail', email); boot(); }
+  catch(err){ btn.disabled = false; btn.textContent = 'Sign in'; fail(err); }
+});
 
 const ICON = {
   queue:'<path d="M4 6h16M4 12h16M4 18h10"/>',
@@ -482,6 +520,9 @@ const ICON = {
   back:'<path d="M15 18l-6-6 6-6"/>',
   copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   bulb:'<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 5.5 5"/>',
+  download:'<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/>',
   file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 18v-6M9 15l3 3 3-3"/>'
 };
 const ic = (n, cls) => `<svg viewBox="0 0 24 24" aria-hidden="true"${cls ? ` class="${cls}"` : ''}>${ICON[n]}</svg>`;
@@ -516,6 +557,10 @@ const F = {
   comment:     {label:'Comment', type:'textarea', full:true, ph:'Anything QA or your manager should know: secondary plan, hospice dates, conflicts…'}
 };
 const SHEET_FIELDS = ['dos','plan','contracted','eligibility','hospice','caseName','notes','comment','status','source','memberId','reference'];
+// Time study: active seconds per section. Counted only while the page is visible and the intern was active in the last 3 minutes.
+const TIME_KEYS = {find:'tFind', ins:'tIns', elig:'tElig', net:'tNet', hosp:'tHosp', svc:'tSvc', decide:'tDecide', doc:'tDoc'};
+const IDLE_MS = 180000, TICK_S = 5;
+function timeFields(){ const o = {}; let tot = 0; Object.keys(TIME_KEYS).forEach(k => { const sec = (S.timing && S.timing[k]) || 0; tot += sec; o[TIME_KEYS[k]] = (sec / 60).toFixed(2); }); o.tTotal = (tot / 60).toFixed(2); return o; }
 const HELPER_FIELDS = Object.keys(F).filter(k => F[k].helper);
 
 const STEPS = [
@@ -630,6 +675,7 @@ function navItems(){
   items.push(['label','Work']);
   if (role() === 'Intern') items.push(['queue','My Queue','queue']);
   if (isMgr()) items.push(['board','Team Board','board'], ['upload','Upload & Assign','upload']);
+  if (isMgr()) items.push(['time','Time Study','clock'], ['team','Team & PINs','team'], ['export','Export Data','download']);
   if (canQA()) items.push(['qa','QA Review','qa']);
   if (role() === 'QA' && !isMgr()) items.push(['board','Team Board','board']);
   items.push(['label','Learn']);
@@ -656,6 +702,7 @@ function renderSide(){
       </div>
       ${IS_GAS ? '' : `<div><div class="nav-label" style="padding:0 0 8px">Demo: view as</div><div class="role-pick">${['Intern','Manager'].map(r => `<button data-role="${r}" class="${role() === r ? 'on' : ''}">${r}</button>`).join('')}</div></div>`}
       <div class="me"><span class="avatar">${esc(initials(me.name))}</span><span style="min-width:0"><div class="me-name">${esc(me.name)}</div><div class="me-sub">${esc(me.role)} · ${esc(me.email)}</div></span></div>
+      ${IS_GAS && TOKEN ? '<div class="role-pick"><button data-act="signout">Sign out</button></div>' : ''}
     </div>`;
   $('#side').classList.toggle('on', S.menu);
   $('#scrim').classList.toggle('on', S.menu || S.kb.open);
@@ -678,6 +725,9 @@ async function go(view, opts){
     else if (view === 'upload') viewUpload();
     else if (view === 'qa') await viewQA();
     else if (view === 'progress') await viewProgress();
+    else if (view === 'export') await viewExport();
+    else if (view === 'team') await viewTeam();
+    else if (view === 'time') await viewTime();
     else if (view === 'work') await openRecord(opts.id);
   } catch(e){ fail(e); }
   renderSide();
@@ -732,14 +782,31 @@ async function openRecord(id){
   S.draft = Object.assign({}, helpers);
   SHEET_FIELDS.forEach(k => { S.draft[k] = r[k] || ''; });
   if (!S.draft.source) S.draft.source = 'TEBRA';
+  if (helpers.statusAuto == null) S.draft.statusAuto = !S.draft.status;
   S.checks = store.get('checks:' + id, {});
   S.step = store.get('step:' + id, 0);
+  const saved = {}, local = store.get('timing:' + id, {});
+  Object.keys(TIME_KEYS).forEach(k => { saved[k] = Math.max(Math.round((parseFloat(r[TIME_KEYS[k]]) || 0) * 60), local[k] || 0); });
+  S.timing = saved; S.lastAct = Date.now(); S.curSec = STEPS[S.step].key;
+  autoStatus();
   renderWork();
 }
 const readOnly = () => S.rec && (S.rec.work === 'Completed' && role() === 'Intern' || (role() !== 'Intern' && S.rec.internEmail !== S.boot.me.email));
+// Pre-select the approval status from the Decision Matrix while the intern hasn't picked one by hand.
+function autoStatus(){
+  if (!S.rec || readOnly()) return;
+  const d = S.draft, sg = suggest(d, S.rec);
+  if (d.statusAuto || !d.status){
+    if (sg.status){ d.status = sg.status; d.statusAuto = true; }
+    else if (d.statusAuto){ d.status = ''; }
+  }
+}
 function persistLocal(){
+  autoStatus();
   const h = {}; HELPER_FIELDS.forEach(k => { if (S.draft[k]) h[k] = S.draft[k]; });
+  h.statusAuto = !!S.draft.statusAuto;
   store.set('helpers:' + S.rec.id, h); store.set('checks:' + S.rec.id, S.checks); store.set('step:' + S.rec.id, S.step);
+  if (S.timing) store.set('timing:' + S.rec.id, S.timing);
 }
 
 function fieldHTML(k){
@@ -762,7 +829,7 @@ function fieldHTML(k){
   } else {
     ctl = `<input class="input" id="${id}" data-in="${k}" value="${esc(v)}" placeholder="${esc(f.ph || '')}" autocomplete="off" ${ro ? 'readonly' : ''}>`;
   }
-  return `<div class="field${f.full ? ' full' : ''}"><label for="${id}" class="lbl">${esc(f.label)}</label>${ctl}${f.helper ? '<span class="hint">Used for the decision only. Not saved to the sheet.</span>' : ''}</div>`;
+  return `<div class="field${f.full ? ' full' : ''}"><label for="${id}" class="lbl">${esc(f.label)}</label>${ctl}${f.helper ? '<span class="hint">Used for the decision only. Not saved to the sheet.</span>' : ''}${k === 'status' && d.statusAuto && v ? '<span class="hint">Pre-selected from your answers. It updates as you change them until you pick a status yourself.</span>' : ''}</div>`;
 }
 
 function suggestionHTML(compact){
@@ -770,9 +837,10 @@ function suggestionHTML(compact){
   const chosen = S.draft.status;
   const mismatch = s.status && chosen && chosen !== s.status;
   return `<div class="suggest ${s.tone}">
-    <span class="eyebrow">Suggested by the Decision Matrix</span>
+    <span class="eyebrow">${s.status && chosen === s.status && S.draft.statusAuto ? 'Pre-selected from the Decision Matrix' : 'Suggested by the Decision Matrix'}</span>
     <span class="s-status">${s.status ? esc(s.status) : 'Not enough answers yet'}</span>
     <span style="font-size:.9rem">${esc(s.rule)}</span>
+    ${s.status && chosen === s.status && S.draft.statusAuto && !compact ? `<span style="font-size:.85rem" class="muted">Confirm it matches what you found. If not, choose a different status below and explain why in the comment.</span>` : ''}
     ${s.status && !readOnly() && chosen !== s.status ? `<div><button class="btn sm primary" data-act="accept">Use this status</button></div>` : ''}
     ${mismatch ? `<span style="font-size:.85rem" class="muted">You chose <b>${esc(chosen)}</b>. Add a comment explaining why it differs.</span>` : ''}
     ${compact ? '' : '<button class="chip" data-kb="decision-matrix" style="align-self:flex-start">Open the Decision Matrix</button>'}
@@ -804,6 +872,7 @@ function renderWork(){
 
 function guidedHTML(){
   const st = STEPS[S.step], k = st.key;
+  S.curSec = k;
   const ticks = S.checks[k] || [];
   const stepDone = i => { const s = STEPS[i]; return s.fields.every(f => { const def = F[f]; return (def.show && !def.show(S.draft, S.rec)) || S.draft[f]; }); };
   const tipsHidden = S.hideTips[k];
@@ -864,12 +933,15 @@ function asideHTML(){
       <dl class="kv"><dt>Record</dt><dd class="mono">${esc(r.id)}</dd><dt>Assigned</dt><dd>${fmtDay(r.assignedOn)}</dd><dt>Intern</dt><dd>${esc(r.internName || '—')}</dd>
       <dt>Started</dt><dd>${esc(r.startedAt || '—')}</dd><dt>Completed</dt><dd>${esc(r.completedAt || '—')}</dd><dt>QA</dt><dd>${esc(r.qa || '—')}</dd>
       ${S.guided ? `<dt>Skill checks</dt><dd class="tnum">${ticked}/${total}</dd>` : ''}</dl></div>
+    ${readOnly() ? '' : `<div class="card"><div class="eyebrow" style="margin-bottom:10px">Time on this account</div>
+      <dl class="kv"><dt>${esc((STEPS.find(x => x.key === S.curSec) || STEPS[0]).short)} (this section)</dt><dd class="tnum mono" id="tsNow">${fmtMin((S.timing || {})[S.curSec] || 0)}</dd><dt>Total active</dt><dd class="tnum mono" id="tsTotal">${fmtMin(Object.values(S.timing || {}).reduce((a, b) => a + b, 0))}</dd></dl>
+      <p class="hint" style="margin-top:8px;font-size:.78rem;color:var(--faint)">Counts active time only. Pauses after 3 minutes without activity.</p></div>`}
     <div class="card"><div class="eyebrow" style="margin-bottom:10px">Quick reference</div><div class="intern-chips">
       ${['decision-matrix','statuses','payer-call','hospice','note-format'].map(id => `<button class="chip" data-kb="${id}">${esc(KB.find(a => a.id === id).title.split('(')[0].trim())}</button>`).join('')}</div></div>
   </aside>`;
 }
 
-function sheetPatch(){ const p = {}; SHEET_FIELDS.forEach(k => p[k] = S.draft[k] || ''); return p; }
+function sheetPatch(){ const p = {}; SHEET_FIELDS.forEach(k => p[k] = S.draft[k] || ''); return Object.assign(p, timeFields()); }
 async function saveDraft(quiet){
   if (readOnly()) return;
   persistLocal();
@@ -888,6 +960,7 @@ async function submitRecord(){
   if (miss.length){ toast('Fill in before submitting: ' + miss.join(', '), true); return; }
   if (d.caseName === 'No' || d.notes === 'No'){ toast('Update the case name and note in TEBRA first, then mark them Yes. QA fails accounts without them.', true); return; }
   const fields = sheetPatch(); fields.mode = S.guided ? 'Guided' : 'Express';
+  { const sg = suggest(d, S.rec); fields.statusSource = !sg.status ? 'No matrix rule' : d.status === sg.status ? 'Decision Matrix' : 'Override (matrix said ' + sg.status + ')'; }
   if (short){ fields.plan = fields.plan || 'N/A'; fields.eligibility = fields.eligibility || 'N/A'; }
   try {
     await call('save', {id:S.rec.id, fields, complete:true});
@@ -963,7 +1036,7 @@ function viewUpload(){
   const assigned = U.rows.filter(r => r.internEmail).length;
   const counts = {}; U.rows.forEach(r => { if (r.internEmail) counts[r.internEmail] = (counts[r.internEmail] || 0) + 1; });
   setMain(shellTop('Upload & Assign') + `
-    <div class="page-head"><div><h1>Upload & assign</h1><p>Add today's accounts and split them between interns. They land in the Google Sheet and in each intern's queue.</p></div></div>
+    <div class="page-head"><div><h1>Upload & assign</h1><p>Add today's accounts and split them between interns. They land in the Google Sheet and in each intern's queue.</p></div><div class="head-actions"><span class="muted" style="font-size:.88rem">${interns.length} active intern${interns.length === 1 ? '' : 's'}</span><button class="btn" data-nav="team">${ic('team')} Manage intern list</button></div></div>
     ${U.rows.length ? '' : `
     <div class="grid-2">
       <label class="drop" id="drop" for="file">${ic('file')}<h3>Drop the Excel or CSV file here</h3><p class="muted">or click to choose. Needs the columns Provider Name, Patient Name, DOB, Type of Service (DOS optional).</p><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></label>
@@ -975,7 +1048,7 @@ function viewUpload(){
     <div class="card">
       <div class="assign-bar">
         <div class="field"><label for="update" class="lbl">Assignment date</label><input type="date" id="update" class="input" value="${U.date}"></div>
-        <div class="field" style="flex:1;min-width:240px"><span class="lbl">Distribute between</span><div class="intern-chips">${interns.map(x => `<button class="chip ${U.pick.has(x.email) ? 'on' : ''}" data-pick="${esc(x.email)}">${esc(x.name)}${counts[x.email] ? ' · ' + counts[x.email] : ''}</button>`).join('') || '<span class="muted">Add interns to the Roster tab first.</span>'}</div></div>
+        <div class="field" style="flex:1;min-width:240px"><span class="lbl">Distribute between</span><div class="intern-chips">${interns.map(x => `<button class="chip ${U.pick.has(x.email) ? 'on' : ''}" data-pick="${esc(x.email)}">${esc(x.name)}${counts[x.email] ? ' · ' + counts[x.email] : ''}</button>`).join('') || '<span class="muted">No interns yet. <button class="btn sm ghost" data-nav="team">Upload your intern list</button></span>'}</div></div>
         <div class="row"><button class="btn" data-act="distribute" ${U.pick.size ? '' : 'disabled'}>Split evenly</button><button class="btn ghost" data-act="clear-up">Start over</button></div>
       </div>
       <div class="card-head" style="padding-top:16px"><h2>${U.rows.length} accounts${U.fileName ? ` <span class="muted" style="font-weight:500;font-size:.9rem">from ${esc(U.fileName)}</span>` : ''}</h2><span class="muted">${assigned} of ${U.rows.length} assigned</span></div>
@@ -1037,6 +1110,201 @@ function renderQA(){
         <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn danger" data-act="qa-fail">Fail & return</button><button class="btn primary" data-act="qa-pass">Pass</button></div>
       </div></aside>` : ''}
     </div>` : `<div class="card"><div class="empty"><h3>All caught up</h3><p>No completed accounts are waiting for QA.</p></div></div>`}`);
+}
+
+/* ---------------- manager: time study ---------------- */
+async function viewTime(){
+  if (!S.ts){ const d = new Date(); d.setDate(d.getDate() - 29); S.ts = {from:d.toLocaleDateString('en-CA'), to:localToday(), tos:''}; }
+  loading('Time Study');
+  const raw = await call('export', {from:S.ts.from, to:S.ts.to, work:'Completed', preview:true});
+  const H = raw.header, col = name => H.indexOf(name);
+  const stepCols = STEPS.map(st => col('MIN: ' + ({find:'FIND PATIENT', ins:'INSURANCE', elig:'ELIGIBILITY', net:'NETWORK', hosp:'HOSPICE', svc:'SERVICE', decide:'DECIDE', doc:'DOCUMENT'})[st.key]));
+  const iTot = col('MIN: TOTAL ACTIVE'), iIntern = col('INTERN NAME'), iEmail = col('INTERN EMAIL'), iTos = col('TYPE OF SERVICE'), iSrc = col('STATUS SOURCE'), iQa = col('QA');
+  const allRecs = raw.rows.map(r => ({intern:r[iIntern] || r[iEmail] || 'Unknown', tos:r[iTos] || '—', src:r[iSrc] || '', qa:r[iQa] || '', steps:stepCols.map(i => parseFloat(r[i]) || 0), total:parseFloat(r[iTot]) || 0})).filter(x => x.total > 0);
+  const services = [...new Set(allRecs.map(x => x.tos))].sort();
+  const recs = allRecs.filter(x => !S.ts.tos || x.tos === S.ts.tos);
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const team = STEPS.map((_, i) => avg(recs.map(x => x.steps[i])));
+  const teamTotal = avg(recs.map(x => x.total));
+  const byIntern = {};
+  recs.forEach(x => { (byIntern[x.intern] = byIntern[x.intern] || []).push(x); });
+  const interns = Object.keys(byIntern).sort().map(n => { const rs = byIntern[n], others = recs.filter(x => x.intern !== n);
+    return {name:n, n:rs.length, steps:STEPS.map((_, i) => avg(rs.map(x => x.steps[i]))), ref:STEPS.map((_, i) => others.length ? avg(others.map(x => x.steps[i])) : team[i]),
+      total:avg(rs.map(x => x.total)), refTotal:others.length ? avg(others.map(x => x.total)) : teamTotal, over:rs.filter(x => /^override/i.test(x.src)).length}; });
+  const maxCell = Math.max(0.01, ...interns.flatMap(x => x.steps));
+  const slowIdx = team.indexOf(Math.max(...team));
+  const overrides = recs.filter(x => /^override/i.test(x.src)).length;
+  const f1 = v => v ? v.toFixed(1) : '—';
+  const cell = (v, ref, who, step) => {
+    const pct = Math.round(12 + 70 * (v / maxCell));
+    const flag = ref > 0 && v >= ref * 1.5 && v - ref >= 0.5;
+    return `<td class="hm${pct > 55 ? ' dark' : ''}" style="--p:${pct}%" title="${esc(who)} · ${esc(step)}: ${v.toFixed(1)} min avg (rest of team ${ref.toFixed(1)})">${f1(v)}${flag ? ' <span class="hm-flag" aria-label="1.5× team average or more">▲</span>' : ''}</td>`;
+  };
+  setMain(shellTop('Time Study') + `
+    <div class="page-head"><div><h1>Time study</h1><p>Average active minutes per section on completed accounts. ▲ marks a section where an intern takes 1.5× the rest of the team's average or more.</p></div>
+      <div class="head-actions">
+        <input type="date" class="input" id="tsfrom" data-ts="from" value="${S.ts.from}" aria-label="From" style="width:auto">
+        <input type="date" class="input" id="tsto" data-ts="to" value="${S.ts.to}" aria-label="To" style="width:auto">
+        <select class="input" id="tstos" data-ts="tos" aria-label="Type of service" style="width:auto"><option value="">All services</option>${services.map(x => `<option ${S.ts.tos === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+      </div></div>
+    ${recs.length ? `
+    <div class="tiles">
+      ${tile('Avg active time per account', teamTotal.toFixed(1) + '<span style="font-size:1.1rem;font-weight:600"> min</span>', recs.length + ' completed accounts with timing', true)}
+      ${tile('Slowest section', `<span style="font-size:1.7rem">${esc(STEPS[slowIdx].short)}</span>`, team[slowIdx].toFixed(1) + ' min team average')}
+      ${tile('Interns measured', interns.length)}
+      ${tile('Matrix overrides', Math.round(overrides / recs.length * 100) + '%', overrides + ' of ' + recs.length + ' accounts')}
+      ${tile('Fastest average', `<span style="font-size:1.4rem">${esc((interns.slice().sort((a, b) => a.total - b.total)[0] || {}).name || '—')}</span>`, ((interns.slice().sort((a, b) => a.total - b.total)[0] || {}).total || 0).toFixed(1) + ' min / account')}
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-head"><h2>Minutes per section, by intern</h2><span class="muted" style="font-size:.85rem">Darker = more time · hover a cell for detail</span></div><div class="spacer"></div>
+      <div class="table-wrap"><table class="heat"><thead><tr><th>Intern</th><th class="num">Accts</th>${STEPS.map(st => `<th class="num">${esc(st.short)}</th>`).join('')}<th class="num">Total</th><th class="num">Overrides</th></tr></thead><tbody>
+        ${interns.map(x => `<tr><td class="pname">${esc(x.name)}</td><td class="num tnum">${x.n}</td>${x.steps.map((v, i) => cell(v, x.ref[i], x.name, STEPS[i].short)).join('')}<td class="num tnum"><b>${x.total.toFixed(1)}</b>${x.refTotal && x.total >= x.refTotal * 1.3 ? ' <span class="hm-flag">▲</span>' : ''}</td><td class="num tnum">${x.over}</td></tr>`).join('')}
+        <tr class="team-row"><td><b>Team average</b></td><td class="num tnum">${recs.length}</td>${team.map(v => `<td class="num tnum">${f1(v)}</td>`).join('')}<td class="num tnum"><b>${teamTotal.toFixed(1)}</b></td><td class="num tnum">${overrides}</td></tr>
+      </tbody></table></div>
+      <p class="muted" style="font-size:.84rem;padding:12px 24px 20px">Active time pauses after 3 minutes without activity, so breaks and idle tabs are left out. Overrides = the intern chose a different status than the Decision Matrix suggested; review those in Export Data (column STATUS SOURCE).</p>
+    </div>
+    <div class="card"><div class="card-head"><h2>Team average by section</h2><span class="muted" style="font-size:.85rem">minutes</span></div>
+      ${bars(STEPS.map((st, i) => [st.title, team[i], team[i].toFixed(1)]), '')}</div>`
+    : `<div class="card"><div class="empty"><h3>No timed accounts in this range</h3><p>Timing is recorded for accounts completed after this update. Widen the date range or check back after interns complete a few accounts.</p></div></div>`}`);
+}
+
+/* ---------------- manager: team & PINs ---------------- */
+async function viewTeam(){
+  if (!S.tm) S.tm = {rows:[], fileName:'', added:null, reveal:new Set(), reset:null};
+  loading('Team & PINs');
+  S.tm.team = await call('team', {});
+  syncRoster();
+  renderTeam();
+}
+function syncRoster(){ S.boot.roster = S.tm.team.filter(x => x.active).map(x => ({name:x.name, email:x.email, role:x.role, active:true})); }
+function parsePeople(grid){
+  grid = grid.map(r => r.map(c => String(c == null ? '' : c).trim())).filter(r => r.some(Boolean));
+  if (!grid.length) return [];
+  let hi = grid.findIndex(r => r.some(c => /e-?mail/i.test(c)));
+  let ni = 0, ei = 1, ri = 2;
+  if (hi > -1){ const h = grid[hi].map(c => c.toLowerCase()); ei = h.findIndex(c => /e-?mail/.test(c)); ni = h.findIndex(c => /name/.test(c)); ri = h.findIndex(c => /role|position/.test(c)); }
+  else { const r0 = grid[0]; ei = r0.findIndex(c => /@/.test(c)); if (ei === -1) throw new Error('Could not find an email column. Use the columns Name, Email, Role.'); ni = ei === 0 ? 1 : 0; ri = -1; hi = -1; }
+  return grid.slice(hi + 1).map(r => ({name: ni > -1 ? r[ni] || '' : '', email:(r[ei] || '').toLowerCase(), role: ri > -1 && r[ri] ? r[ri] : 'Intern'}))
+    .filter(p => p.email).map(p => Object.assign(p, {bad: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email)}));
+}
+function renderTeam(){
+  const T = S.tm, team = T.team;
+  const existing = new Set(team.map(x => x.email));
+  const good = T.rows.filter(r => !r.bad);
+  const newCount = good.filter(r => !existing.has(r.email)).length;
+  setMain(shellTop('Team & PINs') + `
+    <div class="page-head"><div><h1>Team & PINs</h1><p>Your intern list. Everyone here can sign in with their email and PIN, and active interns appear in Upload & Assign.</p></div></div>
+    ${T.added && T.added.length ? `<div class="card card-pad" style="margin-bottom:20px;border-color:var(--good)">
+      <div class="row" style="justify-content:space-between"><div><div class="eyebrow">New PINs</div><h3 style="margin-top:6px">Send each person their PIN privately</h3></div><button class="btn sm" data-act="copy-pins">${ic('copy')} Copy all</button></div>
+      <div class="note-box" id="pinbox" style="margin-top:12px">${esc(T.added.map(a => `${a.name} · ${a.email} · PIN ${a.pin}`).join('\n'))}</div></div>` : ''}
+    ${T.reset ? `<div class="suggest good" style="margin-bottom:20px"><span class="eyebrow">PIN reset</span><span class="s-status mono">${esc(T.reset.pin)}</span><span>New PIN for ${esc(T.reset.email)}. Their old PIN no longer works.</span></div>` : ''}
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-head"><h2>Upload intern list</h2><span class="muted" style="font-size:.85rem">Columns: Name, Email, Role (Intern / QA / Manager, optional)</span></div>
+      ${T.rows.length ? `
+        <div class="spacer"></div>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead><tbody>
+        ${T.rows.map(r => `<tr class="${r.bad ? 'row-bad' : ''}"><td class="pname">${esc(r.name) || '<span class="muted">—</span>'}</td><td class="mono">${esc(r.email)}</td><td>${esc(r.role)}</td><td>${r.bad ? pill('Invalid email', 'bad', true) : existing.has(r.email) ? pill('Update', 'info', true) : pill('New', 'good', true)}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="step-nav" style="padding:0 24px 22px;border:0"><span class="muted">${newCount} new · ${good.length - newCount} update${T.rows.length - good.length ? ' · ' + (T.rows.length - good.length) + ' skipped' : ''}</span>
+          <div class="row"><button class="btn ghost" data-act="tm-clear">Start over</button><button class="btn primary" data-act="tm-save" ${good.length ? '' : 'disabled'}>Save ${good.length} to the Roster</button></div></div>`
+      : `<div class="grid-2" style="padding:20px 24px 24px">
+          <label class="drop" id="tmdrop" for="tmfile">${ic('file')}<h3>Drop an Excel or CSV file</h3><p class="muted">or click to choose</p><input type="file" id="tmfile" accept=".xlsx,.xls,.csv" hidden></label>
+          <div class="field"><label for="tmpaste">Or paste rows (from Sheets, Excel, or one per line)</label><textarea class="input" id="tmpaste" style="min-height:130px" placeholder="Name&#9;Email&#9;Role&#10;Bea Navarro&#9;bea.navarro@gmail.com&#9;Intern"></textarea><div><button class="btn" data-act="tm-paste">Read pasted rows</button></div></div>
+        </div>`}
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Current team</h2><span class="muted" style="font-size:.85rem">${team.filter(x => x.active).length} active · ${team.filter(x => !x.active).length} inactive</span></div><div class="spacer"></div>
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>PIN</th><th></th></tr></thead><tbody>
+      ${team.map(x => `<tr><td class="pname">${esc(x.name)}</td><td class="mono">${esc(x.email)}</td><td>${esc(x.role)}</td><td>${pill(x.active ? 'Active' : 'Inactive', x.active ? 'good' : '')}</td>
+        <td class="mono">${x.pin ? (T.reveal.has(x.email) ? esc(x.pin) : '••••••') : '<span class="muted">none</span>'} ${x.pin ? `<button class="btn sm ghost" data-reveal="${esc(x.email)}">${T.reveal.has(x.email) ? 'Hide' : 'Show'}</button>` : ''}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-resetpin="${esc(x.email)}">Reset PIN</button> <button class="btn sm ${x.active ? 'danger' : ''}" data-toggleactive="${esc(x.email)}" data-on="${x.active ? '0' : '1'}">${x.active ? 'Deactivate' : 'Activate'}</button></td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="muted" style="font-size:.84rem;padding:0 24px 20px">Deactivating removes sign-in access and hides the person from assignment. Their past work stays in the Sheet.</p>
+    </div>`);
+  const drop = $('#tmdrop');
+  if (drop){
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) readTeamFile(f); });
+    $('#tmfile').addEventListener('change', e => { const f = e.target.files[0]; if (f) readTeamFile(f); });
+  }
+}
+function readTeamFile(f){
+  if (!window.XLSX){ toast('The spreadsheet reader did not load. Paste the rows instead.', true); return; }
+  const fr = new FileReader();
+  fr.onload = () => { try {
+    const wb = XLSX.read(new Uint8Array(fr.result), {type:'array'});
+    const name = wb.SheetNames.find(n => /roster|intern|team/i.test(n)) || wb.SheetNames[0];
+    const rows = parsePeople(XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:false, defval:''}));
+    if (!rows.length) throw new Error('No rows with an email found.');
+    S.tm.rows = rows; S.tm.added = null; S.tm.reset = null; renderTeam(); toast(rows.length + ' people read from ' + f.name);
+  } catch(e){ fail(e); } };
+  fr.readAsArrayBuffer(f);
+}
+
+/* ---------------- manager: export ---------------- */
+function exportParams(){ const E = S.ex; return {from:E.from, to:E.to, email:E.email, work:E.work, status:E.status, qa:E.qa}; }
+async function viewExport(){
+  if (!S.ex){ const d = new Date(); S.ex = {from:new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA'), to:localToday(), email:'', work:'', status:'', qa:'', data:null, sheet:null}; }
+  loading('Export Data');
+  S.ex.data = await call('export', Object.assign({preview:true}, exportParams()));
+  renderExport();
+}
+function renderExport(){
+  const E = S.ex, d = E.data, interns = S.boot.roster.filter(x => x.role === 'Intern');
+  const sel = (id, label, opts, val) => `<div class="field"><label for="${id}">${label}</label><select class="input" id="${id}" data-ex="${id.slice(2)}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${val === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  const show = ['DATE OF VERIFICATION','INTERN NAME','PATIENT NAME','TYPE OF SERVICE','INSURANCE PLAN','APPROVAL STATUS','WORK STATUS','QA'];
+  const idx = show.map(h => d.header.indexOf(h));
+  setMain(shellTop('Export Data') + `
+    <div class="page-head"><div><h1>Export data</h1><p>Pull verification records out of the tool for reporting, audits or payroll. Every export is recorded in the Activity Log.</p></div></div>
+    <div class="card card-pad" style="margin-bottom:20px">
+      <div class="fields" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+        <div class="field"><label for="exfrom">Assigned from</label><input type="date" class="input" id="exfrom" data-ex="from" value="${E.from}"></div>
+        <div class="field"><label for="exto">Assigned to</label><input type="date" class="input" id="exto" data-ex="to" value="${E.to}"></div>
+        ${sel('exemail', 'Intern', [['', 'All interns']].concat(interns.map(x => [x.email, x.name])), E.email)}
+        ${sel('exwork', 'Work status', [['', 'Any'], ['Assigned', 'Assigned'], ['In Progress', 'In progress'], ['Completed', 'Completed'], ['Escalated', 'Escalated']], E.work)}
+        ${sel('exstatus', 'Approval status', [['', 'Any']].concat(S.boot.statuses.map(x => [x, x])), E.status)}
+        ${sel('exqa', 'QA', [['', 'Any'], ['pending', 'Awaiting QA'], ['passed', 'Passed'], ['failed', 'Failed']], E.qa)}
+      </div>
+      <div class="step-nav" style="align-items:center">
+        <span><b class="tnum" style="font:800 1.4rem var(--f-display)">${d.rows.length}</b> <span class="muted">record${d.rows.length === 1 ? '' : 's'} match · all ${d.header.length} columns included</span></span>
+        <div class="row">
+          <button class="btn" data-act="ex-csv" ${d.rows.length ? '' : 'disabled'}>${ic('download')} CSV</button>
+          <button class="btn" data-act="ex-xlsx" ${d.rows.length ? '' : 'disabled'}>${ic('download')} Excel (.xlsx)</button>
+          <button class="btn primary" data-act="ex-sheet" ${d.rows.length ? '' : 'disabled'}>Create Google Sheet copy</button>
+        </div>
+      </div>
+      ${E.sheet ? `<div class="suggest good" style="margin-top:16px"><span class="eyebrow">Export ready</span><span class="s-status">${esc(E.sheet.name)}</span><span>${E.sheet.count} records, saved in the Sheet owner's Google Drive.</span><div><a class="btn sm primary" href="${esc(E.sheet.url)}" target="_blank" rel="noopener">Open in Google Sheets</a></div></div>` : ''}
+      <p class="muted" style="font-size:.84rem;margin-top:14px">Exports contain patient names and dates of birth. Store them only in approved locations and delete local copies when you're done.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Preview</h2><span class="muted" style="font-size:.85rem">${d.rows.length > 25 ? 'First 25 of ' + d.rows.length : d.rows.length + ' rows'} · key columns shown</span></div><div class="spacer"></div>
+      ${d.rows.length ? `<div class="table-wrap"><table><thead><tr>${show.map(h => `<th>${esc(h.toLowerCase())}</th>`).join('')}</tr></thead><tbody>
+        ${d.rows.slice(0, 25).map(r => `<tr>${idx.map(i => `<td>${esc(i > -1 ? r[i] : '') || '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty"><h3>No records match these filters</h3><p>Widen the date range or clear a filter.</p></div>`}
+    </div>`);
+}
+function exportFileName(ext){ return 'verify-desk-export_' + S.ex.from + '_to_' + S.ex.to + '.' + ext; }
+function saveBlob(blob, name){
+  if (!IS_GAS){ toast('Downloads work in the live tool. This demo can\'t save files.', true); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('Downloading ' + name + '. If nothing downloads, use "Create Google Sheet copy".');
+}
+async function doExport(kind){
+  const d = await call('export', exportParams());
+  if (kind === 'csv'){
+    const q = v => /[",\n]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+    const csv = '﻿' + [d.header].concat(d.rows).map(r => r.map(q).join(',')).join('\r\n');
+    saveBlob(new Blob([csv], {type:'text/csv;charset=utf-8'}), exportFileName('csv'));
+  } else {
+    if (!window.XLSX){ toast('The Excel writer did not load. Use CSV or the Google Sheet copy.', true); return; }
+    const ws = XLSX.utils.aoa_to_sheet([d.header].concat(d.rows));
+    ws['!cols'] = d.header.map(h => ({wch: Math.min(32, Math.max(12, h.length + 2))}));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pt Verif');
+    const buf = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    saveBlob(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), exportFileName('xlsx'));
+  }
 }
 
 /* ---------------- progress ---------------- */
@@ -1115,7 +1383,7 @@ function renderKB(){
 
 /* ---------------- events ---------------- */
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-nav],[data-act],[data-open],[data-filter],[data-step],[data-set],[data-tips],[data-kb],[data-kbcat],[data-role],[data-pick],[data-qa],[data-reason]');
+  const t = e.target.closest('[data-nav],[data-act],[data-open],[data-filter],[data-step],[data-set],[data-tips],[data-kb],[data-kbcat],[data-role],[data-pick],[data-qa],[data-reason],[data-reveal],[data-resetpin],[data-toggleactive]');
   if (!t) return;
   if (t.closest('[data-stop]') && !t.matches('[data-stop]')) return;
   const ds = t.dataset;
@@ -1130,14 +1398,27 @@ document.addEventListener('click', async e => {
   if (ds.role){ Mock.setRole(ds.role); await boot(); return; }
   if (ds.pick){ S.up.pick.has(ds.pick) ? S.up.pick.delete(ds.pick) : S.up.pick.add(ds.pick); viewUpload(); return; }
   if (ds.qa){ S.qaSel = ds.qa; S.qaReason = ''; renderQA(); return; }
+  if (ds.reveal){ S.tm.reveal.has(ds.reveal) ? S.tm.reveal.delete(ds.reveal) : S.tm.reveal.add(ds.reveal); renderTeam(); return; }
+  if (ds.resetpin){ if (S.tm.confirmReset !== ds.resetpin){ S.tm.confirmReset = ds.resetpin; t.textContent = 'Click again to reset'; t.classList.add('danger'); setTimeout(() => { if (S.tm.confirmReset === ds.resetpin){ S.tm.confirmReset = null; renderTeam(); } }, 4000); return; }
+    S.tm.confirmReset = null; try { const r = await call('teamResetPin', {email:ds.resetpin}); S.tm.team = r.team; S.tm.reset = {email:r.email, pin:r.pin}; S.tm.added = null; renderTeam(); window.scrollTo(0, 0); toast('PIN reset'); } catch(err){ fail(err); } return; }
+  if (ds.toggleactive){ try { S.tm.team = await call('teamSet', {email:ds.toggleactive, active:ds.on === '1'}); syncRoster(); renderTeam(); toast(ds.on === '1' ? 'Activated' : 'Deactivated'); } catch(err){ fail(err); } return; }
   if (ds.reason){ S.qaReason = S.qaReason === ds.reason ? '' : ds.reason; renderQA(); return; }
   switch (ds.act){
     case 'toggle-guided': S.guided = !S.guided; store.set('guided', S.guided); renderSide(); if (S.view === 'work') renderWork(); toast(S.guided ? 'Guided mode on: step-by-step prompts' : 'Express mode: all prompts skipped'); break;
     case 'menu': S.menu = !S.menu; renderSide(); break;
+    case 'tm-paste': { const txt = $('#tmpaste').value; if (!txt.trim()){ toast('Paste your intern list first.', true); break; }
+      try { const rows = parsePeople(txt.split(/\r?\n/).map(l => l.includes('\t') ? l.split('\t') : l.split(','))); if (!rows.length) throw new Error('No rows with an email found.'); S.tm.rows = rows; S.tm.added = null; S.tm.reset = null; renderTeam(); } catch(err){ fail(err); } break; }
+    case 'tm-clear': S.tm.rows = []; renderTeam(); break;
+    case 'tm-save': { t.disabled = true; try { const r = await call('teamUpsert', {people:S.tm.rows.filter(x => !x.bad).map(x => ({name:x.name, email:x.email, role:x.role}))}); S.tm.team = r.team; S.tm.added = r.added; S.tm.rows = []; syncRoster(); renderTeam(); window.scrollTo(0, 0); toast(r.added.length + ' added, ' + r.updated + ' updated'); } catch(err){ t.disabled = false; fail(err); } break; }
+    case 'copy-pins': { const txt = $('#pinbox').textContent; try { await navigator.clipboard.writeText(txt); toast('PINs copied'); } catch(err){ const r = document.createRange(); r.selectNodeContents($('#pinbox')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Selected. Press Ctrl+C to copy.'); } break; }
+    case 'ex-csv': try { await doExport('csv'); } catch(err){ fail(err); } break;
+    case 'ex-xlsx': try { await doExport('xlsx'); } catch(err){ fail(err); } break;
+    case 'ex-sheet': { t.disabled = true; t.textContent = 'Creating…'; try { S.ex.sheet = await call('exportSheet', exportParams()); renderExport(); toast('Google Sheet created'); } catch(err){ t.disabled = false; t.textContent = 'Create Google Sheet copy'; fail(err); } break; }
+    case 'signout': { const t = TOKEN; TOKEN = ''; store.set('token', ''); S.menu = false; try { await new Promise(r => google.script.run.withSuccessHandler(r).withFailureHandler(r).api('logout', {}, t)); } catch(err){} showLogin('You signed out.'); break; }
     case 'kb': openKB(); break;
     case 'kb-close': closeKB(); break;
     case 'kb-list': S.kb.id = null; renderKB(); break;
-    case 'back': go(role() === 'Intern' ? 'queue' : (S.prevBoard || 'board')); break;
+    case 'back': if (S.rec && !readOnly()) saveDraft(true); go(role() === 'Intern' ? 'queue' : (S.prevBoard || 'board')); break;
     case 'prev': if (S.step > 0){ saveDraft(true); S.step--; persistLocal(); renderWork(); window.scrollTo(0, 0); } break;
     case 'next': await saveDraft(true); S.step = Math.min(STEPS.length - 1, S.step + 1); persistLocal(); renderWork(); window.scrollTo(0, 0); break;
     case 'save': await saveDraft(false); renderWork(); break;
@@ -1145,7 +1426,7 @@ document.addEventListener('click', async e => {
     case 'escalate': S.pendingEscalate = true; renderWork(); break;
     case 'escalate-no': S.pendingEscalate = false; renderWork(); break;
     case 'escalate-yes': await escalateRecord(); break;
-    case 'accept': { const s = suggest(S.draft, S.rec); if (s.status){ S.draft.status = s.status; persistLocal(); renderWork(); toast('Status set to ' + s.status); } break; }
+    case 'accept': { const s = suggest(S.draft, S.rec); if (s.status){ S.draft.status = s.status; S.draft.statusAuto = true; persistLocal(); renderWork(); toast('Status set to ' + s.status); } break; }
     case 'copy-note': {
       const txt = noteText(S.draft, S.rec);
       try { await navigator.clipboard.writeText(txt); toast('Note copied. Paste it into TEBRA.'); }
@@ -1175,7 +1456,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.in){ S.draft[t.dataset.in] = t.value; persistLocal(); if (t.tagName === 'SELECT') renderWork(); return; }
+  if (t.dataset.in){ S.draft[t.dataset.in] = t.value; if (t.dataset.in === 'status') S.draft.statusAuto = !t.value; persistLocal(); if (t.tagName === 'SELECT') renderWork(); return; }
   if (t.dataset.check){ const k = t.dataset.check, i = +t.dataset.i, arr = S.checks[k] || []; S.checks[k] = t.checked ? [...new Set(arr.concat(i))] : arr.filter(x => x !== i); persistLocal(); renderWork(); return; }
   if (t.dataset.comp != null){ let c = store.get('competencies', []); const i = +t.dataset.comp; c = t.checked ? [...new Set(c.concat(i))] : c.filter(x => x !== i); store.set('competencies', c); viewProgress(); return; }
   if (t.dataset.sel){ t.checked ? S.boardSel.add(t.dataset.sel) : S.boardSel.delete(t.dataset.sel); viewBoardKeep(); return; }
@@ -1184,6 +1465,8 @@ document.addEventListener('change', e => {
   if (t.id === 'qdate'){ S.date = t.value || localToday(); viewQueue().catch(fail); return; }
   if (t.id === 'bdate'){ S.date = t.value || localToday(); S.boardSel.clear(); viewBoard().catch(fail); return; }
   if (t.id === 'bfilter'){ S.boardIntern = t.value; S.boardSel.clear(); viewBoard().catch(fail); return; }
+  if (t.dataset.ts){ S.ts[t.dataset.ts] = t.value; viewTime().catch(fail); return; }
+  if (t.dataset.ex){ S.ex[t.dataset.ex] = t.value; S.ex.sheet = null; viewExport().catch(fail); return; }
   if (t.id === 'progEmail'){ S.progEmail = t.value; viewProgress().catch(fail); return; }
   if (t.id === 'update'){ S.up.date = t.value || localToday(); return; }
 });
@@ -1206,10 +1489,10 @@ const Mock = (function(){
   const T = localToday();
   const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
   const roster = [
-    {name:'Jimmar S.', email:'manager@demo.example', role:'Manager', active:true},
-    {name:'Bea Navarro', email:'bea@demo.example', role:'Intern', active:true},
-    {name:'Carlo Dizon', email:'carlo@demo.example', role:'Intern', active:true},
-    {name:'Mika Santos', email:'mika@demo.example', role:'Intern', active:true}
+    {name:'Jimmar S.', email:'manager@demo.example', role:'Manager', active:true, pin:'482913'},
+    {name:'Bea Navarro', email:'bea@demo.example', role:'Intern', active:true, pin:'105284'},
+    {name:'Carlo Dizon', email:'carlo@demo.example', role:'Intern', active:true, pin:'771046'},
+    {name:'Mika Santos', email:'mika@demo.example', role:'Intern', active:true, pin:'639520'}
   ];
   let roleNow = store.get('demoRole', 'Intern');
   const me = () => roleNow === 'Manager' ? roster[0] : roster[1];
@@ -1239,12 +1522,26 @@ const Mock = (function(){
     mk('Sample history 3','01/01/1950','Dr. Elena Park, NP','TCM',B, done({assignedOn:daysAgo(3), qa:'FAILED', qaComment:'Pt hospice alert not updated'})),
     mk('Sample history 4','01/01/1950','Dr. Samuel Reyes, MD','Home Visit',B, done({assignedOn:daysAgo(3), qa:'PASSED', mode:'Express'}))
   ];
+  // Sample timing for completed demo rows (each intern has a different weak spot).
+  const base = [1.2, 2.0, 4.5, 2.4, 1.1, 1.8, 0.9, 3.2], weak = {'bea@demo.example':2, 'carlo@demo.example':7, 'mika@demo.example':3};
+  rows.filter(r => r.work === 'Completed' || r.qa).forEach((r, i) => {
+    const ks = ['tFind','tIns','tElig','tNet','tHosp','tSvc','tDecide','tDoc']; let tot = 0;
+    ks.forEach((k, j) => { let v = base[j] * (0.8 + ((i * 7 + j * 3) % 5) / 10); if (weak[r.internEmail] === j) v *= 2.1; v = Math.round(v * 100) / 100; r[k] = String(v); tot += v; });
+    r.tTotal = String(Math.round(tot * 100) / 100);
+    r.statusSource = i % 4 === 1 ? 'Override (matrix said Good to Schedule)' : 'Decision Matrix';
+  });
   const clone = o => JSON.parse(JSON.stringify(o));
   const find = id => rows.find(r => r.id === id);
   const stamp = () => T + ' ' + new Date().toTimeString().slice(0, 5);
   function handle(a, p){
     const u = me();
-    if (a === 'bootstrap') return {me:u, roster, statuses:['Good to Schedule','Provider out of Network','Policy Not Active','Deceased','Approved for Self Pay','No self pay agreement','Ok for Group Billing','Frequency Requirement Not Met','TEBRA INACTIVE','ON HOLD','No TCM Coverage'], today:T};
+    const pin = () => String(Math.floor(100000 + Math.random() * 900000));
+    if (a === 'team') return roster;
+    if (a === 'teamUpsert'){ const added = []; let updated = 0; p.people.forEach(x => { const role = /manager/i.test(x.role) ? 'Manager' : /qa/i.test(x.role) ? 'QA' : 'Intern'; const ex = roster.find(r => r.email === x.email);
+      if (ex){ ex.name = x.name || ex.name; ex.role = role; ex.active = true; updated++; } else { const o = {name:x.name || x.email.split('@')[0], email:x.email, role, active:true, pin:pin()}; roster.push(o); added.push(o); } }); return {added, updated, team:roster}; }
+    if (a === 'teamSet'){ const r = roster.find(x => x.email === p.email); if (r.email === u.email && !p.active) throw new Error("You can't deactivate yourself."); r.active = p.active; return roster; }
+    if (a === 'teamResetPin'){ const r = roster.find(x => x.email === p.email); r.pin = pin(); return {email:r.email, pin:r.pin, team:roster}; }
+    if (a === 'bootstrap') return {me:u, roster:roster.filter(x => x.active).map(({pin, ...x}) => x), statuses:['Good to Schedule','Provider out of Network','Policy Not Active','Deceased','Approved for Self Pay','No self pay agreement','Ok for Group Billing','Frequency Requirement Not Met','TEBRA INACTIVE','ON HOLD','No TCM Coverage'], today:T};
     if (a === 'queue') return rows.filter(r => {
       if (u.role === 'Intern' && r.internEmail !== u.email) return false;
       if (p.needsQA) return r.work === 'Completed' && !r.qa;
@@ -1262,6 +1559,12 @@ const Mock = (function(){
       const by = {}; roster.filter(x => x.role === 'Intern').forEach(x => by[x.email] = {name:x.name, email:x.email, assigned:0, inProgress:0, completed:0, escalated:0});
       const sc = {}; rs.forEach(r => { const b = by[r.internEmail]; if (b){ b.assigned++; if (r.work === 'Completed') b.completed++; if (r.work === 'In Progress') b.inProgress++; if (r.work === 'Escalated') b.escalated++; } if (r.status) sc[r.status] = (sc[r.status] || 0) + 1; });
       return {date, interns:Object.values(by), statusCounts:sc, rows:rs}; }
+    if (a === 'export'){ const H = ['DATE OF VERIFICATION','INTERN NAME','APPROVAL STATUS','PROVIDER NAME','PATIENT NAME','DOB','TYPE OF SERVICE','DOS','INSURANCE PLAN','CONTRACTED (YES OR NO)','ELIGIBILITY (YES OR NO)','Patient in hospice? (Yes or No)','Case Name Updated? (Yes or No)','Notes Updated? (Yes or No)','Comment','QA','QA Comment','RECORD ID','ASSIGNED DATE','INTERN EMAIL','WORK STATUS','VERIFIED VIA','MEMBER ID','REFERENCE # / REP','GUIDANCE MODE','STARTED AT','COMPLETED AT','QA BY','LAST UPDATED BY','STATUS SOURCE','MIN: FIND PATIENT','MIN: INSURANCE','MIN: ELIGIBILITY','MIN: NETWORK','MIN: HOSPICE','MIN: SERVICE','MIN: DECIDE','MIN: DOCUMENT','MIN: TOTAL ACTIVE'];
+      const K = ['verifDate','internName','status','provider','patient','dob','tos','dos','plan','contracted','eligibility','hospice','caseName','notes','comment','qa','qaComment','id','assignedOn','internEmail','work','source','memberId','reference','mode','startedAt','completedAt','qaBy','updatedBy','statusSource','tFind','tIns','tElig','tNet','tHosp','tSvc','tDecide','tDoc','tTotal'];
+      const rs = rows.filter(r => r.assignedOn >= (p.from || '0') && r.assignedOn <= (p.to || '9') && (!p.email || r.internEmail === p.email) && (!p.work || r.work === p.work) && (!p.status || r.status === p.status)
+        && (!p.qa || (p.qa === 'pending' ? r.work === 'Completed' && !r.qa : p.qa === 'passed' ? /^pass/i.test(r.qa) : /^fail/i.test(r.qa))));
+      return {header:H, rows:rs.map(r => K.map(k => r[k] || ''))}; }
+    if (a === 'exportSheet') throw new Error('The demo can\'t create Google Sheets. In the live tool this button makes a copy in your Drive.');
     if (a === 'stats'){ const mine = rows.filter(r => r.internEmail === (u.role === 'Intern' ? u.email : (p.email || B.email)));
       const d = mine.filter(r => r.work === 'Completed' || /^fail/i.test(r.qa)); const q = d.filter(r => r.qa); const pass = q.filter(r => /^pass/i.test(r.qa));
       const f = {}; q.filter(r => /^fail/i.test(r.qa)).forEach(r => f[r.qaComment] = (f[r.qaComment] || 0) + 1);
@@ -1275,6 +1578,22 @@ const Mock = (function(){
   };
 })();
 
+/* ---------------- time study ticker ---------------- */
+const FIELD_SECTION = {}; STEPS.forEach(st => st.fields.forEach(f => FIELD_SECTION[f] = st.key));
+['click','keydown','input','scroll','touchstart'].forEach(ev => document.addEventListener(ev, () => { S.lastAct = Date.now(); }, {passive:true, capture:true}));
+let lastMove = 0; document.addEventListener('mousemove', () => { const n = Date.now(); if (n - lastMove > 5000){ lastMove = n; S.lastAct = n; } }, {passive:true});
+document.addEventListener('focusin', e => { if (S.view !== 'work' || S.guided) return; const el = e.target.closest('[data-in],[data-set]'); const k = el && (el.dataset.in || el.dataset.set); if (k && FIELD_SECTION[k]) S.curSec = FIELD_SECTION[k]; });
+document.addEventListener('click', e => { if (S.view !== 'work' || S.guided) return; const el = e.target.closest('[data-set],[data-act="copy-note"]'); if (!el) return; S.curSec = el.dataset.set ? (FIELD_SECTION[el.dataset.set] || S.curSec) : 'doc'; }, true);
+setInterval(() => {
+  if (S.view !== 'work' || !S.rec || !S.timing || readOnly()) return;
+  if (document.visibilityState !== 'visible' || Date.now() - (S.lastAct || 0) > IDLE_MS) return;
+  const k = S.curSec || 'find'; S.timing[k] = (S.timing[k] || 0) + TICK_S;
+  store.set('timing:' + S.rec.id, S.timing);
+  const el = $('#tsNow'); if (el) el.textContent = fmtMin(S.timing[k]);
+  const tt = $('#tsTotal'); if (tt) tt.textContent = fmtMin(Object.values(S.timing).reduce((a, b) => a + b, 0));
+}, TICK_S * 1000);
+function fmtMin(sec){ const m = Math.floor(sec / 60), s2 = Math.round(sec % 60); return m + ':' + String(s2).padStart(2, '0'); }
+
 /* ---------------- boot ---------------- */
 async function boot(){
   setMain('<div class="loading">Loading your workspace…</div>');
@@ -1285,7 +1604,8 @@ async function boot(){
     if (canQA()) call('queue', {needsQA:true}).then(q => { S.qaCount = q.length; renderSide(); }).catch(() => {});
     go(role() === 'Intern' ? 'queue' : 'board');
   } catch(e){
-    $('#side').innerHTML = '<div class="brand"><span class="brand-mark">Verify Desk</span><span class="brand-name">Eligibility<br>&amp; Benefits</span></div>';
+    if (IS_GAS && !S.boot && /sign in/i.test(e.message || '')) return; // login screen already shown
+    $('#side').innerHTML = BRAND;
     setMain(`<div class="card card-pad" style="max-width:560px;margin-top:40px"><h2>You can't open the Verify Desk yet</h2><p class="muted" style="margin-top:8px">${esc(e.message || e)}</p></div>`);
   }
 }

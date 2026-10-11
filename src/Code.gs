@@ -13,13 +13,17 @@
  *  3. Save, select the function "setup" in the toolbar, click Run, and
  *     approve the permissions. This adds the tool columns and the
  *     Roster / Activity Log tabs, and makes you a Manager.
- *  4. Open the "Roster" tab and add every intern: NAME, EMAIL (their
- *     company Google account), ROLE = Intern (or Manager / QA), ACTIVE = Yes.
+ *  4. Open the "Roster" tab and add every intern: NAME, EMAIL, ROLE = Intern
+ *     (or Manager / QA), ACTIVE = Yes. Leave PIN blank, then run "setup"
+ *     again: it fills a random 6-digit PIN for anyone who has none.
+ *     Give each person their PIN privately. They sign in with email + PIN.
  *  5. Deploy > New deployment > type "Web app".
  *       Execute as:      Me
- *       Who has access:  Anyone within your organization
+ *       Who has access:  Anyone
  *     Copy the web app URL and share it with interns. Interns do NOT need
  *     access to the Sheet itself — they only ever see rows assigned to them.
+ *     (On a Google Workspace domain you can choose "Anyone within your
+ *     organization" instead; signed-in Roster members then skip the PIN.)
  *  6. After any later code change: Deploy > Manage deployments > Edit >
  *     Version: New version > Deploy (the URL stays the same).
  */
@@ -63,11 +67,23 @@ var COLS = {
   startedAt:   'STARTED AT',
   completedAt: 'COMPLETED AT',
   qaBy:        'QA BY',
-  updatedBy:   'LAST UPDATED BY'
+  updatedBy:   'LAST UPDATED BY',
+  // ---- decision + time study ----
+  statusSource:'STATUS SOURCE',
+  tFind:       'MIN: FIND PATIENT',
+  tIns:        'MIN: INSURANCE',
+  tElig:       'MIN: ELIGIBILITY',
+  tNet:        'MIN: NETWORK',
+  tHosp:       'MIN: HOSPICE',
+  tSvc:        'MIN: SERVICE',
+  tDecide:     'MIN: DECIDE',
+  tDoc:        'MIN: DOCUMENT',
+  tTotal:      'MIN: TOTAL ACTIVE'
 };
 var COL_ORDER = ['verifDate','internName','status','provider','patient','dob','tos','dos','plan',
   'contracted','eligibility','hospice','caseName','notes','comment','qa','qaComment',
-  'id','assignedOn','internEmail','work','source','memberId','reference','mode','startedAt','completedAt','qaBy','updatedBy'];
+  'id','assignedOn','internEmail','work','source','memberId','reference','mode','startedAt','completedAt','qaBy','updatedBy',
+  'statusSource','tFind','tIns','tElig','tNet','tHosp','tSvc','tDecide','tDoc','tTotal'];
 
 var APPROVAL_STATUSES = ['Good to Schedule','Provider out of Network','Policy Not Active','Deceased',
   'Approved for Self Pay','No self pay agreement','Ok for Group Billing','Frequency Requirement Not Met',
@@ -77,7 +93,8 @@ var YES_NO = ['Yes','No'];
 
 // Fields an intern may write. Manager-provided fields are read-only for interns.
 var INTERN_FIELDS = ['dos','plan','contracted','eligibility','hospice','caseName','notes','comment',
-  'status','source','memberId','reference','mode'];
+  'status','source','memberId','reference','mode',
+  'statusSource','tFind','tIns','tElig','tNet','tHosp','tSvc','tDecide','tDoc','tTotal'];
 
 // ---------- Web app entry ----------
 function doGet() {
@@ -127,16 +144,28 @@ function setup() {
   setList_(sh, map.source, ['TEBRA','Payer portal','Payer call','Clearinghouse']);
 
   // Roster
-  var ro = ss.getSheetByName(CFG.ROSTER_SHEET);
-  if (!ro) {
-    ro = ss.insertSheet(CFG.ROSTER_SHEET);
-    ro.getRange(1, 1, 1, 4).setValues([['NAME','EMAIL','ROLE','ACTIVE']]).setFontWeight('bold');
-    var me = Session.getActiveUser().getEmail();
-    ro.getRange(2, 1, 1, 4).setValues([[me.split('@')[0], me, 'Manager', 'Yes']]);
-    setList_(ro, 3, ['Intern','Manager','QA']);
-    setList_(ro, 4, YES_NO);
-    ro.setFrozenRows(1);
+  var ro = ss.getSheetByName(CFG.ROSTER_SHEET) || ss.insertSheet(CFG.ROSTER_SHEET);
+  ro.getRange(1, 1, 1, 5).setValues([['NAME','EMAIL','ROLE','ACTIVE','PIN']]).setFontWeight('bold');
+  ro.setFrozenRows(1);
+  setList_(ro, 3, ['Intern','Manager','QA']);
+  setList_(ro, 4, YES_NO);
+  ro.getRange(2, 5, ro.getMaxRows() - 1, 1).setNumberFormat('@');
+  var owner = String(Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || '');
+  var hasRows = ro.getLastRow() >= 2 && ro.getRange(2, 2, ro.getLastRow() - 1, 1).getDisplayValues().some(function (r) { return r[0]; });
+  if (!hasRows && owner) ro.getRange(2, 1, 1, 4).setValues([[owner.split('@')[0], owner, 'Manager', 'Yes']]);
+  // Give everyone without a PIN a random 6-digit one.
+  var issued = [];
+  if (ro.getLastRow() >= 2) {
+    var vals = ro.getRange(2, 1, ro.getLastRow() - 1, 5).getDisplayValues();
+    vals.forEach(function (r, i) {
+      if (r[1] && !String(r[4]).trim()) {
+        var pin = String(Math.floor(100000 + Math.random() * 900000));
+        ro.getRange(i + 2, 5).setValue(pin);
+        issued.push(r[1] + ' → ' + pin);
+      }
+    });
   }
+  if (issued.length) Logger.log('New PINs issued:\n' + issued.join('\n'));
   // Activity log
   var lg = ss.getSheetByName(CFG.LOG_SHEET);
   if (!lg) {
@@ -149,10 +178,12 @@ function setup() {
 }
 
 // ---------- Single API dispatcher (called from the page) ----------
-function api(action, payload) {
+function api(action, payload, token) {
   payload = payload || {};
-  var me = currentUser_();
-  if (!me.role) throw new Error('Your Google account (' + me.email + ') is not on the Roster yet. Ask your manager to add you.');
+  if (action === 'login') return login_(payload.email, payload.pin);
+  if (action === 'logout') { if (token) CacheService.getScriptCache().remove('tok:' + token); return true; }
+  var me = currentUser_(token);
+  if (!me.role) throw new Error('AUTH: Sign in with your email and PIN.');
   switch (action) {
     case 'bootstrap': return bootstrap_(me);
     case 'queue':     return queue_(me, payload);
@@ -163,6 +194,12 @@ function api(action, payload) {
     case 'reassign':  requireManager_(me); return reassign_(me, payload);
     case 'qa':        requireQA_(me); return qa_(me, payload);
     case 'summary':   requireManager_(me); return summary_(payload);
+    case 'team':        requireManager_(me); return team_();
+    case 'teamUpsert':  requireManager_(me); return teamUpsert_(me, payload);
+    case 'teamSet':     requireManager_(me); return teamSet_(me, payload);
+    case 'teamResetPin':requireManager_(me); return teamResetPin_(me, payload);
+    case 'export':      requireManager_(me); return export_(me, payload);
+    case 'exportSheet': requireManager_(me); return exportSheet_(me, payload);
     case 'stats':     return stats_(me, payload);
     default: throw new Error('Unknown action: ' + action);
   }
@@ -172,7 +209,7 @@ function bootstrap_(me) {
   adoptNewRows_();
   return {
     me: me,
-    roster: roster_().filter(function (r) { return r.active; }),
+    roster: roster_().filter(function (r) { return r.active; }).map(function (r) { return { name: r.name, email: r.email, role: r.role, active: r.active }; }),
     statuses: APPROVAL_STATUSES,
     today: today_()
   };
@@ -241,6 +278,113 @@ function summary_(p) {
   return { date: date, interns: Object.keys(by).map(function (k) { return by[k]; }), statusCounts: statusCounts, rows: rows };
 }
 
+// ---------- Team / Roster management (managers only) ----------
+function rosterSheet_() { return SpreadsheetApp.getActive().getSheetByName(CFG.ROSTER_SHEET); }
+function newPin_() { return String(Math.floor(100000 + Math.random() * 900000)); }
+function team_() {
+  return roster_().map(function (r) { return { name: r.name, email: r.email, role: r.role, active: r.active, pin: r.pin }; });
+}
+// Adds new people and updates name/role of existing ones (matched by email). New people get a PIN.
+function teamUpsert_(me, p) {
+  var people = (p.people || []).filter(function (x) { return x && /@/.test(x.email || ''); });
+  if (!people.length) throw new Error('No valid rows. Each person needs an email address.');
+  return withLock_(function () {
+    var sh = rosterSheet_();
+    var last = Math.max(sh.getLastRow(), 1);
+    var vals = last >= 2 ? sh.getRange(2, 1, last - 1, 5).getDisplayValues() : [];
+    var byEmail = {};
+    vals.forEach(function (r, i) { if (r[1]) byEmail[r[1].trim().toLowerCase()] = i + 2; });
+    var added = [], updated = 0;
+    people.forEach(function (x) {
+      var email = String(x.email).trim().toLowerCase();
+      var role = /manager/i.test(x.role) ? 'Manager' : (/qa/i.test(x.role) ? 'QA' : 'Intern');
+      var name = String(x.name || email.split('@')[0]).trim();
+      var row = byEmail[email];
+      if (row) {
+        sh.getRange(row, 1).setValue(name);
+        sh.getRange(row, 3, 1, 2).setValues([[role, 'Yes']]);
+        if (!String(sh.getRange(row, 5).getDisplayValue()).trim()) sh.getRange(row, 5).setValue(newPin_());
+        updated++;
+      } else {
+        var pin = newPin_();
+        var at = lastRosterRow_(sh) + 1;
+        sh.getRange(at, 1, 1, 5).setNumberFormat('@').setValues([[name, email, role, 'Yes', pin]]);
+        byEmail[email] = at;
+        added.push({ name: name, email: email, role: role, pin: pin });
+      }
+    });
+    log_(me, 'team upload', '', added.length + ' added, ' + updated + ' updated');
+    return { added: added, updated: updated, team: team_() };
+  });
+}
+function lastRosterRow_(sh) {
+  var n = sh.getLastRow(); if (n < 2) return 1;
+  var v = sh.getRange(2, 2, n - 1, 1).getDisplayValues();
+  for (var i = v.length - 1; i >= 0; i--) if (v[i][0]) return i + 2;
+  return 1;
+}
+function rosterRow_(email) {
+  var sh = rosterSheet_(), n = sh.getLastRow(); if (n < 2) return 0;
+  var v = sh.getRange(2, 2, n - 1, 1).getDisplayValues();
+  for (var i = 0; i < v.length; i++) if (v[i][0].trim().toLowerCase() === String(email).toLowerCase()) return i + 2;
+  return 0;
+}
+function teamSet_(me, p) {
+  var row = rosterRow_(p.email); if (!row) throw new Error('That person is not on the Roster.');
+  if (String(p.email).toLowerCase() === me.email && p.active === false) throw new Error('You can\'t deactivate yourself.');
+  rosterSheet_().getRange(row, 4).setValue(p.active ? 'Yes' : 'No');
+  log_(me, p.active ? 'activate' : 'deactivate', '', p.email);
+  return team_();
+}
+function teamResetPin_(me, p) {
+  var row = rosterRow_(p.email); if (!row) throw new Error('That person is not on the Roster.');
+  var pin = newPin_();
+  rosterSheet_().getRange(row, 5).setNumberFormat('@').setValue(pin);
+  log_(me, 'reset PIN', '', p.email);
+  return { email: p.email, pin: pin, team: team_() };
+}
+
+// ---------- Export (managers only) ----------
+// Columns in the original template order, then the tool columns.
+function exportRows_(p) {
+  var from = p.from || '0000-00-00', to = p.to || '9999-99-99';
+  var rows = readAll_().filter(function (r) {
+    var d = r.assignedOn || '';
+    if (d < from || d > to) return false;
+    if (p.email && r.internEmail.toLowerCase() !== String(p.email).toLowerCase()) return false;
+    if (p.work && r.work !== p.work) return false;
+    if (p.status && r.status !== p.status) return false;
+    if (p.qa === 'pending' && (r.work !== 'Completed' || r.qa)) return false;
+    if (p.qa === 'passed' && !/^pass/i.test(r.qa)) return false;
+    if (p.qa === 'failed' && !/^fail/i.test(r.qa)) return false;
+    return true;
+  });
+  var header = COL_ORDER.map(function (k) { return COLS[k]; });
+  var data = rows.map(function (r) { return COL_ORDER.map(function (k) { return r[k] || ''; }); });
+  return { header: header, rows: data };
+}
+function export_(me, p) {
+  var out = exportRows_(p);
+  if (!p.preview) log_(me, 'export', '', out.rows.length + ' rows (' + (p.from || 'start') + ' to ' + (p.to || 'today') + ')');
+  return out;
+}
+// Creates a new Google Sheet with the filtered rows in the owner's Drive and shares it with the requester.
+function exportSheet_(me, p) {
+  var out = exportRows_(p);
+  var name = 'Verify Desk export ' + nowStamp_();
+  var ss = SpreadsheetApp.create(name);
+  var sh = ss.getSheets()[0];
+  sh.setName('Export');
+  var all = [out.header].concat(out.rows);
+  sh.getRange(1, 1, all.length, out.header.length).setNumberFormat('@').setValues(all);
+  sh.getRange(1, 1, 1, out.header.length).setFontWeight('bold').setBackground('#164a4b').setFontColor('#ffffff');
+  sh.setFrozenRows(1);
+  var owner = Session.getEffectiveUser().getEmail().toLowerCase();
+  if (me.email && me.email !== owner) { try { ss.addEditor(me.email); } catch (e) {} }
+  log_(me, 'export sheet', '', out.rows.length + ' rows → ' + name);
+  return { url: ss.getUrl(), name: name, count: out.rows.length };
+}
+
 // ---------- Writes ----------
 function startRecord_(me, id) {
   return withLock_(function () {
@@ -261,6 +405,9 @@ function saveRecord_(me, p) {
     var patch = {};
     Object.keys(p.fields || {}).forEach(function (k) {
       if (INTERN_FIELDS.indexOf(k) !== -1) patch[k] = String(p.fields[k] == null ? '' : p.fields[k]).slice(0, 2000);
+    });
+    Object.keys(patch).forEach(function (k) {
+      if (/^t[A-Z]/.test(k)) { var n = Number(patch[k]); patch[k] = isFinite(n) && n >= 0 ? Math.min(Math.round(n * 100) / 100, 1440) : ''; }
     });
     if (patch.status && APPROVAL_STATUSES.indexOf(patch.status) === -1) throw new Error('Unknown approval status: ' + patch.status);
     if (p.complete) {
@@ -343,19 +490,42 @@ function qa_(me, p) {
 }
 
 // ---------- Helpers ----------
-function currentUser_() {
-  var email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
-  var r = roster_().filter(function (x) { return x.email === email && x.active; })[0];
+// Who is calling: a valid sign-in token first, then (Workspace domains only) the Google session.
+function currentUser_(token) {
+  var email = '';
+  if (token) email = CacheService.getScriptCache().get('tok:' + token) || '';
+  if (!email) email = String(Session.getActiveUser().getEmail() || '');
+  email = email.toLowerCase();
+  var r = email ? roster_().filter(function (x) { return x.email === email && x.active; })[0] : null;
   return { email: email, name: r ? r.name : email.split('@')[0], role: r ? r.role : '' };
+}
+// Email + PIN sign-in. Tokens last 8 hours. 5 wrong PINs locks that email for 15 minutes.
+function login_(email, pin) {
+  email = String(email || '').trim().toLowerCase();
+  pin = String(pin || '').trim();
+  var cache = CacheService.getScriptCache();
+  var failKey = 'fail:' + email;
+  var fails = Number(cache.get(failKey) || 0);
+  if (fails >= 5) throw new Error('Too many wrong PINs. Try again in 15 minutes, or ask your manager to check your PIN.');
+  var r = roster_().filter(function (x) { return x.email === email && x.active; })[0];
+  if (!r || !r.pin || r.pin !== pin) {
+    cache.put(failKey, String(fails + 1), 900);
+    throw new Error('That email and PIN don\'t match an active person on the Roster.');
+  }
+  cache.remove(failKey);
+  var token = Utilities.getUuid();
+  cache.put('tok:' + token, email, 28800);
+  log_({ email: email }, 'sign in', '', '');
+  return { token: token };
 }
 function roster_() {
   var sh = SpreadsheetApp.getActive().getSheetByName(CFG.ROSTER_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getDisplayValues()
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues()
     .filter(function (r) { return r[1]; })
     .map(function (r) {
       var role = /manager/i.test(r[2]) ? 'Manager' : (/qa/i.test(r[2]) ? 'QA' : 'Intern');
-      return { name: r[0] || r[1].split('@')[0], email: r[1].trim().toLowerCase(), role: role, active: !/^no/i.test(r[3]) };
+      return { name: r[0] || r[1].split('@')[0], email: r[1].trim().toLowerCase(), role: role, active: !/^no/i.test(r[3]), pin: String(r[4] || '').trim() };
     });
 }
 function requireManager_(me) { if (me.role !== 'Manager') throw new Error('Only managers can do this.'); }
